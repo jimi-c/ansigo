@@ -1,0 +1,34 @@
+- hosts: localhost
+  gather_facts: no
+  tasks:
+  - name: test foo
+    debug:
+      msg: "Here we are"
+  - name: task two
+    fail:
+    when: 1 == 1
+
+- hosts: localhost
+  gather_facts: false
+  tasks:
+  - debug:
+      msg: "task outside of a block"
+  - name: block one
+    block:
+    - debug:
+        msg: "test debug in block 1"
+    rescue:
+    - debug:
+        msg: "test debug in rescue of block 1"
+    always:
+    - debug:
+        msg: "test debug in always of block 1"
+  - name: block two
+    block:
+    - debug:
+        msg: "test debug in block 2"
+    - name: nested block
+      block:
+      - debug:
+          msg: "debug in nested block"
+
