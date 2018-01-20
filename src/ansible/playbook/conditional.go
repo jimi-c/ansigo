@@ -1,15 +1,14 @@
 package playbook
 
 import (
-  //"ansible/playbook"
 )
 
 var conditional_fields = map[string]FieldAttribute{
-  "When": FieldAttribute{T: "string"},
+  "when": FieldAttribute{T: "list", Default: nil},
 }
 
 type Conditional struct {
-  When string
+  Attr_when interface{}
 }
 
 func (c *Conditional) Load(data map[interface{}]interface{}) {

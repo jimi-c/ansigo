@@ -31,6 +31,11 @@ func main() {
       play_data, _ := playbook_data.GetIndex(play_idx).Map()
       p := playbook.NewPlay(play_data)
       fmt.Printf("%#f\n", p)
+      //if play_idx == 1 {
+      //  t, _ := p.Tasks[1].Attr_block[0].(playbook.Task)
+      //  fmt.Println(t.Register())
+      //  fmt.Println("The delegate to is: ", t.DelegateTo())
+      //}
     }
   }
 }

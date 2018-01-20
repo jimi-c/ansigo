@@ -1,50 +1,51 @@
 package playbook
 
 import (
+  "reflect"
 )
 
 type Parent interface {
-  GetInheritedValue()
+  GetInheritedValue(attr string) interface{}
 }
 
 var task_fields = map[string]FieldAttribute{
-  "Async_Val": FieldAttribute{
+  "async_val": FieldAttribute{
     T: "int", Default: 0, Required: false, Priority: 0, Inherit: true, Alias: []string{"async"}, Extend: false, Prepend: false,
   },
-  "Changed_When": FieldAttribute{
+  "changed_when": FieldAttribute{
     T: "list", Default: nil, Required: false, Priority: 0, Inherit: true, Alias: []string{}, Extend: false, Prepend: false,
   },
-  "Delay": FieldAttribute{
+  "delay": FieldAttribute{
     T: "int", Default: 5, Required: false, Priority: 0, Inherit: true, Alias: make([]string, 0), Extend: false, Prepend: false,
   },
-  "Delegate_To": FieldAttribute{
-    T: "string", Default: "", Required: false, Priority: 0, Inherit: true, Alias: make([]string, 0), Extend: false, Prepend: false,
+  "delegate_to": FieldAttribute{
+    T: "string", Default: nil, Required: false, Priority: 0, Inherit: true, Alias: make([]string, 0), Extend: false, Prepend: false,
   },
-  "Delegate_Facts": FieldAttribute{
+  "delegate_facts": FieldAttribute{
     T: "bool", Default: false, Required: false, Priority: 0, Inherit: true, Alias: make([]string, 0), Extend: false, Prepend: false,
   },
-  "Failed_When": FieldAttribute{
+  "failed_when": FieldAttribute{
     T: "list", Default: nil, Required: false, Priority: 0, Inherit: true, Alias: []string{}, Extend: false, Prepend: false,
   },
-  "Loop": FieldAttribute{
+  "loop": FieldAttribute{
     T: "list", Default: nil, Required: false, Priority: 0, Inherit: true, Alias: []string{}, Extend: false, Prepend: false,
   },
   //"Loop_Control": FieldAttribute{
   //  T: "struct", Default: nil, Required: false, Priority: 0, Inherit: true, Alias: []string{"async"}, Extend: false, Prepend: false,
   //},
-  "Notify": FieldAttribute{
+  "notify": FieldAttribute{
     T: "list", Default: nil, Required: false, Priority: 0, Inherit: true, Alias: []string{}, Extend: false, Prepend: false,
   },
-  "Poll": FieldAttribute{
+  "poll": FieldAttribute{
     T: "int", Default: 10, Required: false, Priority: 0, Inherit: true, Alias: make([]string, 0), Extend: false, Prepend: false,
   },
-  "Register": FieldAttribute{
+  "register": FieldAttribute{
     T: "string", Default: "", Required: false, Priority: 0, Inherit: true, Alias: make([]string, 0), Extend: false, Prepend: false,
   },
-  "Retries": FieldAttribute{
+  "retries": FieldAttribute{
     T: "int", Default: 3, Required: false, Priority: 0, Inherit: true, Alias: make([]string, 0), Extend: false, Prepend: false,
   },
-  "Until": FieldAttribute{
+  "until": FieldAttribute{
     T: "list", Default: nil, Required: false, Priority: 0, Inherit: true, Alias: []string{}, Extend: false, Prepend: false,
   },
 }
@@ -52,33 +53,70 @@ var task_fields = map[string]FieldAttribute{
 type Task struct {
   // composed structs
   Base
+  Become
   Conditional
   Taggable
-  Become
 
   // the parent object (a block, or another task)
   parent *Parent
 
-  Action string
-  Args map[interface{}]interface{}
+  Attr_action interface{}
+  Attr_args interface{}
 
   // Field Attributes
-  Async_Val int
-  Changed_When []string
-  Delay int
-  Delegate_To string
-  Delegate_Facts bool
-  Failed_When []string
-  Loop []interface{}
-  //Loop_Control LoopControl
-  Notify []string
-  Poll int
-  Register string
-  Retries int
-  Until []string
+  Attr_async_val interface{}
+  Attr_changed_when interface{}
+  Attr_delay interface{}
+  Attr_delegate_to interface{}
+  Attr_delegate_facts interface{}
+  Attr_failed_when interface{}
+  Attr_loop interface{}
+  //loop_control interface{}
+  Attr_notify interface{}
+  Attr_poll interface{}
+  Attr_register interface{}
+  Attr_retries interface{}
+  Attr_until interface{}
 }
 
-func (t *Task) GetInheritedValue() {
+func (t *Task) GetAllObjectFieldAttributes() map[string]FieldAttribute {
+  var all_fields = make(map[string]FieldAttribute)
+  var items = []map[string]FieldAttribute{base_fields, conditional_fields, taggable_fields, become_fields, task_fields}
+  for i := 0; i < len(items); i++ {
+    for k, v := range items[i] {
+      all_fields[k] = v
+    }
+  }
+  return all_fields
+}
+
+func (t *Task) GetInheritedValue(attr string) interface{} {
+  all_fields := t.GetAllObjectFieldAttributes()
+  field_attribute := all_fields[attr]
+
+  field_name := "Attr_" + attr
+  s := reflect.ValueOf(t).Elem()
+  field := s.FieldByName(field_name)
+
+  var cur_value interface{}
+  if field.Kind() != reflect.Invalid {
+    cur_value = field.Interface()
+  } else {
+    cur_value = nil
+  }
+
+  get_parent_value := field_attribute.Inherit &&
+                      t.parent != nil &&
+                      cur_value != reflect.Zero(field.Type()) &&
+                      !(t.squashed || t.finalized)
+  if get_parent_value {
+    parent_value := (*t.parent).GetInheritedValue(attr)
+    if parent_value != reflect.Zero(field.Type()) && parent_value != nil {
+      cur_value = parent_value
+    }
+  }
+
+  return cur_value
 }
 
 func (t *Task) Load(data map[interface{}]interface{}) {
@@ -91,15 +129,145 @@ func (t *Task) Load(data map[interface{}]interface{}) {
 
   for k, v := range data {
     if k.(string) == "debug" {
-      t.Action = k.(string)
+      t.Attr_action = k.(string)
       switch s := TypeOf(v); s {
         case "map":
-          t.Args = v.(map[interface{}] interface{})
+          t.Attr_args = v.(map[interface{}] interface{})
         default:
-          t.Args = make(map[interface{}] interface{})
+          t.Attr_args = make(map[interface{}] interface{})
       }
       delete(data, k.(string))
     }
+  }
+}
+
+// local getters
+func (t *Task) Action() string {
+  if res, ok := t.Attr_action.(string); ok {
+    return res
+  }
+  return ""
+}
+func (t *Task) Args() map[interface{}]interface{} {
+  if res, ok := t.Attr_args.(map[interface{}]interface{}); ok {
+    return res
+  }
+  return make(map[interface{}]interface{})
+}
+func (t *Task) AsyncVal() int {
+  if res, ok := t.GetInheritedValue("async_val").(int); ok {
+    return res
+  } else {
+    res, _ := task_fields["async_val"].Default.(int)
+    return res
+  }
+}
+func (t *Task) ChangedWhen() []string {
+  if res, ok := t.GetInheritedValue("changed_when").([]string); ok {
+    return res
+  } else {
+    res, _ := task_fields["changed_when"].Default.([]string)
+    return res
+  }
+}
+func (t *Task) Delay() int {
+  if res, ok := t.GetInheritedValue("delay").(int); ok {
+    return res
+  } else {
+    res, _ := task_fields["delay"].Default.(int)
+    return res
+  }
+}
+func (t *Task) DelegateTo() string {
+  if res, ok := t.GetInheritedValue("delegate_to").(string); ok {
+    return res
+  } else {
+    res, _ := task_fields["delegate_to"].Default.(string)
+    return res
+  }
+}
+func (t *Task) DelegateFacts() bool {
+  if res, ok := t.GetInheritedValue("delegate_facts").(bool); ok {
+    return res
+  } else {
+    res, _ := task_fields["delegate_facts"].Default.(bool)
+    return res
+  }
+}
+func (t *Task) FailedWhen() []string {
+  if res, ok := t.GetInheritedValue("failed_when").([]string); ok {
+    return res
+  } else {
+    res, _ := task_fields["failed_when"].Default.([]string)
+    return res
+  }
+}
+func (t *Task) Loop() []string {
+  if res, ok := t.GetInheritedValue("loop").([]string); ok {
+    return res
+  } else {
+    res, _ := task_fields["loop"].Default.([]string)
+    return res
+  }
+}
+func (t *Task) Notify() []string {
+  if res, ok := t.GetInheritedValue("notify").([]string); ok {
+    return res
+  } else {
+    res, _ := task_fields["notify"].Default.([]string)
+    return res
+  }
+}
+func (t *Task) Poll() int {
+  if res, ok := t.GetInheritedValue("poll").(int); ok {
+    return res
+  } else {
+    res, _ := task_fields["poll"].Default.(int)
+    return res
+  }
+}
+func (t *Task) Retries() int {
+  if res, ok := t.GetInheritedValue("retries").(int); ok {
+    return res
+  } else {
+    res, _ := task_fields["retries"].Default.(int)
+    return res
+  }
+}
+func (t *Task) Register() string {
+  if res, ok := t.GetInheritedValue("register").(string); ok {
+    return res
+  } else {
+    res, _ := task_fields["register"].Default.(string)
+    return res
+  }
+}
+func (t *Task) Until() []string {
+  if res, ok := t.GetInheritedValue("until").([]string); ok {
+    return res
+  } else {
+    res, _ := task_fields["until"].Default.([]string)
+    return res
+  }
+}
+// base mixin getters
+// become mixin getters
+// conditional mixin getters
+func (t *Task) When() []string {
+  if res, ok := t.GetInheritedValue("when").([]string); ok {
+    return res
+  } else {
+    res, _ := conditional_fields["when"].Default.([]string)
+    return res
+  }
+}
+// taggable mixin getters
+func (t *Task) Tags() []string {
+  if res, ok := t.GetInheritedValue("tags").([]string); ok {
+    return res
+  } else {
+    res, _ := taggable_fields["tags"].Default.([]string)
+    return res
   }
 }
 
@@ -108,18 +276,4 @@ func NewTask(data map[interface{}]interface{}, parent Parent) *Task {
   t.parent = &parent
   t.Load(data)
   return t
-}
-
-func TypeOf(v interface{}) string {
-    switch t := v.(type) {
-    case int:
-        return "int"
-    case float64:
-        return "float64"
-    case map[interface{}] interface{}:
-        return "map"
-    default:
-        _ = t
-        return "unknown"
-    }
 }

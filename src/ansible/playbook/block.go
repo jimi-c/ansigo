@@ -1,37 +1,76 @@
 package playbook
 
 import (
+  "reflect"
 )
 
 var block_fields = map[string]FieldAttribute{
-  "Delegate_To": FieldAttribute{
+  "delegate_to": FieldAttribute{
     T: "string", Default: "", Required: false, Priority: 0, Inherit: true, Alias: make([]string, 0), Extend: false, Prepend: false,
   },
-  "Delegate_Facts": FieldAttribute{
+  "delegate_facts": FieldAttribute{
     T: "bool", Default: false, Required: false, Priority: 0, Inherit: true, Alias: make([]string, 0), Extend: false, Prepend: false,
   },
 }
 
 type Block struct {
   Base
+  Become
   Conditional
   Taggable
-  Become
 
   // the parent object (a block, or another task)
   parent *Parent
   implicit_block bool
-  block []interface{}
-  rescue []interface{}
-  always []interface{}
 
-  // Field Attributes
-  Delegate_To string
-  Delegate_Facts bool
+  // read from yaml, but loaded recursively by helpers
+  Attr_block []interface{}
+  Attr_rescue []interface{}
+  Attr_always []interface{}
+
+  // attributes read from yaml directly
+  Attr_delegate_to interface{}
+  Attr_delegate_facts interface{}
 }
 
-func (b *Block) GetInheritedValue() {
+func (b *Block) GetAllObjectFieldAttributes() map[string]FieldAttribute {
+  var all_fields = make(map[string]FieldAttribute)
+  var items = []map[string]FieldAttribute{base_fields, conditional_fields, taggable_fields, become_fields, block_fields}
+  for i := 0; i < len(items); i++ {
+    for k, v := range items[i] {
+      all_fields[k] = v
+    }
+  }
+  return all_fields
+}
 
+func (b *Block) GetInheritedValue(attr string) interface{} {
+  all_fields := b.GetAllObjectFieldAttributes()
+  field_attribute := all_fields[attr]
+
+  field_name := "Attr_" + attr
+  s := reflect.ValueOf(b).Elem()
+  field := s.FieldByName(field_name)
+
+  var cur_value interface{}
+  if field.Kind() != reflect.Invalid {
+    cur_value = field.Interface()
+  } else {
+    cur_value = nil
+  }
+
+  get_parent_value := field_attribute.Inherit &&
+                      b.parent != nil &&
+                      cur_value != reflect.Zero(field.Type()) &&
+                      !(b.squashed || b.finalized)
+  if get_parent_value {
+    parent_value := (*b.parent).GetInheritedValue(attr)
+    if parent_value != reflect.Zero(field.Type()) && parent_value != nil {
+      cur_value = parent_value
+    }
+  }
+
+  return cur_value
 }
 
 func (b *Block) Load(data map[interface{}]interface{}, play *Play, parent Parent, use_handlers bool) {
@@ -49,23 +88,61 @@ func (b *Block) Load(data map[interface{}]interface{}, play *Play, parent Parent
   if contains_block {
     // FIXME handle errors here
     bb, _ := data_block.([]interface{})
-    b.block = LoadListOfTasks(bb, play, b, use_handlers)
+    b.Attr_block = LoadListOfTasks(bb, play, b, use_handlers)
   } else {
-    b.block = make([]interface{}, 0)
+    b.Attr_block = make([]interface{}, 0)
   }
   if contains_rescue {
     // FIXME handle errors here
     br, _ := data_rescue.([]interface{})
-    b.rescue = LoadListOfTasks(br, play, b, use_handlers)
+    b.Attr_rescue = LoadListOfTasks(br, play, b, use_handlers)
   } else {
-    b.rescue = make([]interface{}, 0)
+    b.Attr_rescue = make([]interface{}, 0)
   }
   if contains_always {
     // FIXME handle errors here
     ba, _ := data_always.([]interface{})
-    b.always = LoadListOfTasks(ba, play, b, use_handlers)
+    b.Attr_always = LoadListOfTasks(ba, play, b, use_handlers)
   } else {
-    b.always = make([]interface{}, 0)
+    b.Attr_always = make([]interface{}, 0)
+  }
+}
+
+// local getters
+func (b *Block) DelegateTo() string {
+  if res, ok := b.GetInheritedValue("delegate_to").(string); ok {
+    return res
+  } else {
+    res, _ := block_fields["delegate_to"].Default.(string)
+    return res
+  }
+}
+func (b *Block) DelegateFacts() bool {
+  if res, ok := b.GetInheritedValue("delegate_facts").(bool); ok {
+    return res
+  } else {
+    res, _ := block_fields["delegate_facts"].Default.(bool)
+    return res
+  }
+}
+// base mixin getters
+// become mixin getters
+// conditional mixin getters
+func (b *Block) When() []string {
+  if res, ok := b.GetInheritedValue("when").([]string); ok {
+    return res
+    } else {
+      res, _ := conditional_fields["when"].Default.([]string)
+      return res
+    }
+  }
+// taggable mixin getters
+func (b *Block) Tags() []string {
+  if res, ok := b.GetInheritedValue("tags").([]string); ok {
+    return res
+  } else {
+    res, _ := taggable_fields["tags"].Default.([]string)
+    return res
   }
 }
 

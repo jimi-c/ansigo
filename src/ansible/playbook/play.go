@@ -9,33 +9,36 @@ type Play struct {
   Taggable
   Become
 
-  // Field Attributes
-  hosts []string
-  // facts
-  fact_path string
-  gather_facts bool
-  gather_subset []string
-  gather_timeout int
-  // variable attributes
-  vars_files []string
-  vars_prompt []interface{}
-  vault_password string
   // role attributes
   //roles []Role
-  // block and task lists
-  handlers []Block
-  pre_tasks []Block
-  tasks []Block
-  post_tasks []Block
+  // block and task lists are read from yaml, but not via
+  // the normal LoadValidFields method.
+  Handlers []Block
+  Pre_tasks []Block
+  Tasks []Block
+  Post_tasks []Block
+
+  // Field attributes read from yaml
+  Attr_hosts interface{}
+  // facts
+  Attr_fact_path interface{}
+  Attr_gather_facts interface{}
+  Attr_gather_subset interface{}
+  Attr_gather_timeout interface{}
+  // variable attributes
+  Attr_vars_files interface{}
+  Attr_vars_prompt interface{}
+  Attr_vault_password interface{}
   // flag/setting attributes
-  force_handlers bool
-  max_fail_percentage float64
-  serial []int
-  strategy string
-  order string
+  Attr_force_handlers interface{}
+  Attr_max_fail_percentage interface{}
+  Attr_serial interface{}
+  Attr_strategy interface{}
+  Attr_order interface{}
 }
 
-func (p *Play) GetInheritedValue() {
+func (p *Play) GetInheritedValue(attr string) interface{} {
+  return nil
 }
 
 func (p *Play) Load(data map[interface{}]interface{}) {
@@ -47,7 +50,7 @@ func (p *Play) Load(data map[interface{}]interface{}) {
   data_tasks, contains_tasks := data["tasks"]
   if contains_tasks {
     td, _ := data_tasks.([]interface{})
-    p.tasks = LoadListOfBlocks(td, p, p, false)
+    p.Tasks = LoadListOfBlocks(td, p, p, false)
   }
 }
 

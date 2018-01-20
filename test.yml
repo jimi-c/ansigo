@@ -23,6 +23,7 @@
     always:
     - debug:
         msg: "test debug in always of block 1"
+    delegate_to: otherhost
   - name: block two
     block:
     - debug:
