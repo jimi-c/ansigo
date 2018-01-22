@@ -1,6 +1,8 @@
 package playbook
 
 import (
+  "fmt"
+  "os"
   "reflect"
   "strings"
 )
@@ -15,25 +17,30 @@ type FieldAttribute struct {
   Alias []string
   Extend bool
   Prepend bool
+  SkipLoad bool
 }
 
-/*
-func NewFieldAttribute() *FieldAttribute {
-  return FieldAttribute{
-    Required: false,
-    Priority: 0,
-    AlwaysPostValidate: false,
-    Inherit: true,
-    Alias: make([]string, 0),
-    Extend: false,
-    Prepend: false,
-  }
+// interfaces we use for playbooks
+
+type Parent interface {
+  GetInheritedValue(attr string) interface{}
 }
-*/
+
+type Validateable interface {
+  GetAllObjectFieldAttributes() map[string]FieldAttribute
+}
+
+// Methods used for all Playbook structs, but not tied directly to them
 
 func LoadValidFields(thing interface{}, field_map map[string]FieldAttribute, data map[interface{}]interface{}) {
   s := reflect.ValueOf(thing).Elem()
   for k, v := range field_map {
+    if v.SkipLoad{
+      // some special fields are contained in the FieldAttributes
+      // for validation, but we don't want to load them here as we
+      // load them specially in other ways
+      continue
+    }
     field_name := "Attr_" + k
     field := s.FieldByName(field_name)
     if field_data, ok := data[strings.ToLower(k)]; ok {
@@ -48,6 +55,34 @@ func LoadValidFields(thing interface{}, field_map map[string]FieldAttribute, dat
     }
   }
 }
+
+func ValidateFields(thing Validateable, data map[interface{}]interface{}, is_task bool) {
+  all_fields := thing.GetAllObjectFieldAttributes()
+  for data_k, _ := range data {
+    if ks, ok := data_k.(string); ok {
+      found := false
+      if _, found = all_fields[ks]; !found {
+        if is_task {
+          _, found = ModuleCache[ks]
+        }
+      }
+      if !found {
+        fmt.Println("Invalid field: ", ks)
+        os.Exit(1)
+      }
+    } else {
+      fmt.Println("Invalid field: ", data_k, "All fields must be string entries in YAML.")
+      os.Exit(1)
+    }
+  }
+}
+
+func PostValidate(thing Validateable) Validateable {
+  _ = thing.GetAllObjectFieldAttributes()
+  return thing
+}
+
+// The base struct and related methods/etc.
 
 var base_fields = map[string]FieldAttribute{
   "name": FieldAttribute{T: "string", Default: ""},
@@ -69,18 +104,4 @@ func (b *Base) Load(data map[interface{}]interface{}) {
   b.squashed = false
   b.finalized = false
   LoadValidFields(b, base_fields, data)
-}
-
-func TypeOf(v interface{}) string {
-    switch t := v.(type) {
-    case int:
-        return "int"
-    case float64:
-        return "float64"
-    case map[interface{}] interface{}:
-        return "map"
-    default:
-        _ = t
-        return "unknown"
-    }
 }

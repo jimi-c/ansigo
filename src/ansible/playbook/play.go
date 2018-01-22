@@ -1,13 +1,16 @@
 package playbook
 
-import ()
+import (
+  "reflect"
+)
 
 var play_fields = map[string]FieldAttribute{
 }
 
 type Play struct {
-  Taggable
+  Base
   Become
+  Taggable
 
   // role attributes
   //roles []Role
@@ -37,8 +40,29 @@ type Play struct {
   Attr_order interface{}
 }
 
+func (p *Play) GetAllObjectFieldAttributes() map[string]FieldAttribute {
+  var all_fields = make(map[string]FieldAttribute)
+  var items = []map[string]FieldAttribute{base_fields, taggable_fields, become_fields, play_fields}
+  for i := 0; i < len(items); i++ {
+    for k, v := range items[i] {
+      all_fields[k] = v
+    }
+  }
+  return all_fields
+}
+
 func (p *Play) GetInheritedValue(attr string) interface{} {
-  return nil
+  field_name := "Attr_" + attr
+  s := reflect.ValueOf(p).Elem()
+  field := s.FieldByName(field_name)
+
+  var cur_value interface{}
+  if field.Kind() != reflect.Invalid {
+    cur_value = field.Interface()
+  } else {
+    cur_value = nil
+  }
+  return cur_value
 }
 
 func (p *Play) Load(data map[interface{}]interface{}) {

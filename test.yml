@@ -33,3 +33,9 @@
       - debug:
           msg: "debug in nested block"
 
+- hosts: localhost
+  gather_facts: no
+  tasks:
+  - ping:
+  - name: some command
+    command: "echo 'Hello'"

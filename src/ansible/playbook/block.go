@@ -5,6 +5,9 @@ import (
 )
 
 var block_fields = map[string]FieldAttribute{
+  "block": FieldAttribute{SkipLoad: true},
+  "rescue": FieldAttribute{SkipLoad: true},
+  "always": FieldAttribute{SkipLoad: true},
   "delegate_to": FieldAttribute{
     T: "string", Default: "", Required: false, Priority: 0, Inherit: true, Alias: make([]string, 0), Extend: false, Prepend: false,
   },
@@ -79,8 +82,6 @@ func (b *Block) Load(data map[interface{}]interface{}, play *Play, parent Parent
   b.Taggable.Load(data)
   b.Become.Load(data)
 
-  LoadValidFields(b, block_fields, data)
-
   data_block, contains_block := data["block"]
   data_rescue, contains_rescue := data["rescue"]
   data_always, contains_always := data["always"]
@@ -89,6 +90,7 @@ func (b *Block) Load(data map[interface{}]interface{}, play *Play, parent Parent
     // FIXME handle errors here
     bb, _ := data_block.([]interface{})
     b.Attr_block = LoadListOfTasks(bb, play, b, use_handlers)
+    delete(data, "block")
   } else {
     b.Attr_block = make([]interface{}, 0)
   }
@@ -96,6 +98,7 @@ func (b *Block) Load(data map[interface{}]interface{}, play *Play, parent Parent
     // FIXME handle errors here
     br, _ := data_rescue.([]interface{})
     b.Attr_rescue = LoadListOfTasks(br, play, b, use_handlers)
+    delete(data, "rescue")
   } else {
     b.Attr_rescue = make([]interface{}, 0)
   }
@@ -103,9 +106,12 @@ func (b *Block) Load(data map[interface{}]interface{}, play *Play, parent Parent
     // FIXME handle errors here
     ba, _ := data_always.([]interface{})
     b.Attr_always = LoadListOfTasks(ba, play, b, use_handlers)
+    delete(data, "always")
   } else {
     b.Attr_always = make([]interface{}, 0)
   }
+
+  LoadValidFields(b, block_fields, data)
 }
 
 // local getters
@@ -161,6 +167,7 @@ func NewBlock(data map[interface{}]interface{}, play *Play, parent Parent, use_h
   }
 
   b := new(Block)
+  ValidateFields(b, data, false)
   b.Load(data, play, parent, use_handlers)
   b.parent = &parent
   b.implicit_block = implicit

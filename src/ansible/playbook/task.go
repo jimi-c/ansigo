@@ -4,10 +4,6 @@ import (
   "reflect"
 )
 
-type Parent interface {
-  GetInheritedValue(attr string) interface{}
-}
-
 var task_fields = map[string]FieldAttribute{
   "async_val": FieldAttribute{
     T: "int", Default: 0, Required: false, Priority: 0, Inherit: true, Alias: []string{"async"}, Extend: false, Prepend: false,
@@ -109,6 +105,9 @@ func (t *Task) GetInheritedValue(attr string) interface{} {
                       t.parent != nil &&
                       cur_value != reflect.Zero(field.Type()) &&
                       !(t.squashed || t.finalized)
+  // FIXME: do append and prepend stuff here too, as well as other
+  //        considerations from the python version such as dynamic
+  //        includes, etc.
   if get_parent_value {
     parent_value := (*t.parent).GetInheritedValue(attr)
     if parent_value != reflect.Zero(field.Type()) && parent_value != nil {
@@ -128,11 +127,15 @@ func (t *Task) Load(data map[interface{}]interface{}) {
   LoadValidFields(t, task_fields, data)
 
   for k, v := range data {
-    if k.(string) == "debug" {
+    if _, ok := ModuleCache[k.(string)]; ok {
       t.Attr_action = k.(string)
       switch s := TypeOf(v); s {
         case "map":
           t.Attr_args = v.(map[interface{}] interface{})
+        case "string":
+          raw_modules := map[string]string{"command":"", "shell":"", "script":""}
+          _, check_raw := raw_modules[k.(string)]
+          t.Attr_args = ParseKV(v.(string), check_raw)
         default:
           t.Attr_args = make(map[interface{}] interface{})
       }
@@ -271,8 +274,10 @@ func (t *Task) Tags() []string {
   }
 }
 
+// the generator function for tasks
 func NewTask(data map[interface{}]interface{}, parent Parent) *Task {
   t := new(Task)
+  ValidateFields(t, data, true)
   t.parent = &parent
   t.Load(data)
   return t
