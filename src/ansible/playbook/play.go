@@ -5,6 +5,26 @@ import (
 )
 
 var play_fields = map[string]FieldAttribute{
+  // fields used for validation only
+  "pre_tasks": FieldAttribute{SkipLoad: true},
+  "tasks": FieldAttribute{SkipLoad: true},
+  "post_tasks": FieldAttribute{SkipLoad: true},
+  "handlers": FieldAttribute{SkipLoad: true},
+  "roles": FieldAttribute{SkipLoad: true},
+  // fields pulled from YAML directly
+  "hosts": FieldAttribute{T: "list", Default: nil, ListOf: "string"},
+  "fact_path": FieldAttribute{T: "string", Default: nil},
+  "gather_facts": FieldAttribute{T: "bool", Default: nil},
+  "gather_subset": FieldAttribute{T:"barelist", Default: nil},
+  "gather_timeout": FieldAttribute{T:"int", Default: nil},
+  "vars_files": FieldAttribute{T:"list", Default: nil, Priority: 99},
+  "vars_prompt": FieldAttribute{T:"list", Default: nil},
+  "vault_password": FieldAttribute{T:"string", Default: nil},
+  "force_handlers": FieldAttribute{T:"bool", Default: false},
+  "max_fail_percentage": FieldAttribute{T:"float64", Default: 0.0},
+  "serial": FieldAttribute{T:"list", Default: nil, ListOf: "int"},
+  "strategy": FieldAttribute{T:"string", Default: nil},
+  "order": FieldAttribute{T:"string", Default: nil},
 }
 
 type Play struct {
@@ -77,6 +97,52 @@ func (p *Play) Load(data map[interface{}]interface{}) {
     p.Tasks = LoadListOfBlocks(td, p, p, false)
   }
 }
+
+// local getters
+func (p *Play) Hosts() []string {
+  if res, ok := p.Attr_hosts.([]string); ok {
+    return res
+  } else {
+    res, _ := play_fields["hosts"].Default.([]string)
+    return res
+  }
+}
+func (p *Play) GatherFacts() bool {
+  if res, ok := p.Attr_gather_facts.(bool); ok {
+    return res
+  } else {
+    res, _ := play_fields["gather_facts"].Default.(bool)
+    return res
+  }
+}
+func (p *Play) GatherSubset() []string {
+  if res, ok := p.Attr_gather_subset.([]string); ok {
+    return res
+  } else {
+    res, _ := play_fields["gather_subset"].Default.([]string)
+    return res
+  }
+}
+func (p *Play) Serial() []int {
+  if res, ok := p.Attr_serial.([]int); ok {
+    return res
+  } else {
+    res, _ := play_fields["serial"].Default.([]int)
+    return res
+  }
+}
+// base mixin getters
+// become mixin getters
+// taggable mixin getters
+func (p *Play) Tags() []string {
+  if res, ok := p.Attr_tags.([]string); ok {
+    return res
+  } else {
+    res, _ := taggable_fields["tags"].Default.([]string)
+    return res
+  }
+}
+
 
 func NewPlay(data map[interface{}]interface{}) *Play {
   p := new(Play)

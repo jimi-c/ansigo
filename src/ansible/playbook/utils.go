@@ -218,6 +218,8 @@ func TypeOf(v interface{}) string {
       return "map"
     case string:
       return "string"
+    case interface{}:
+      return "interface{}"
     default:
       _ = t
       return "unknown"

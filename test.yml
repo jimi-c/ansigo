@@ -1,5 +1,16 @@
-- hosts: localhost
+- hosts:
+  - host01
+  - host02
+  - host03
+  - host04
+  - host05
+  - host06
+  - host07
+  - host08
+  - host09
+  - host10
   gather_facts: no
+  serial: [1, 2, 3]
   tasks:
   - name: test foo
     debug:
