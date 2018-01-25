@@ -1,17 +1,20 @@
 package executor
 
 import (
+  "fmt"
   "ansible/inventory"
   "ansible/playbook"
 )
 
 type PlaybookExecutor struct {
+  Inventory *inventory.InventoryManager
+  TQM *TaskQueueManager
   Playbooks []string
-  TQM interface{}
 }
 
 func (pbe *PlaybookExecutor) Load(playbooks []string) {
   pbe.Playbooks = playbooks
+  pbe.TQM = NewTaskQueueManager(pbe.Inventory, false)
 }
 
 func (pbe *PlaybookExecutor) Run() int {
@@ -36,7 +39,7 @@ func (pbe *PlaybookExecutor) Run() int {
       // do vars prompting
       // if doing a syntax check, continue
       // if we don't have a tqm save the entry, otherwise we run it
-      if pbe.TQM != nil {
+      if pbe.TQM == nil {
         // save it
       } else {
         // run it
@@ -48,12 +51,14 @@ func (pbe *PlaybookExecutor) Run() int {
         serial_batches := pbe.GetSerializedBatches(*validated_play)
         // loop over serial batches
         if len(serial_batches) == 0 {
-
+          fmt.Println("SERIAL BATCHES ARE ZERO")
         } else {
           for _, batch := range serial_batches {
             // set inventory restriction to batch
 
             // execute TQM Run()
+            fmt.Println("running tqm")
+            pbe.TQM.Run(validated_play)
 
             // break the play if the result equals the special return code
 

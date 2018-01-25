@@ -16,7 +16,7 @@ func (pb *Playbook) Load(file_name string) {
   pb.FileName = file_name
   cwd, err := filepath.Abs("./")
   if err != nil {
-    // FIXME error handling
+    // FIXME: error handling
   } else {
     if filepath.IsAbs(file_name) {
       basedir, _ := filepath.Split(file_name)
@@ -29,14 +29,16 @@ func (pb *Playbook) Load(file_name string) {
   }
 
   yamlFile, err := ioutil.ReadFile(file_name)
+  if err != nil {
+  }
   playbook_data, err := simpleyaml.NewYaml(yamlFile)
   if err != nil {
-    // FIXME: error handling
+    panic("Invalid YAML: " + file_name)
   }
 
   plays, err := playbook_data.Array()
   if err != nil {
-    // FIXME: error handling
+    panic("Invalid YAML (plays must be specified as a list of play objects):" + file_name)
   }
 
   for play_idx := 0; play_idx < len(plays); play_idx++ {

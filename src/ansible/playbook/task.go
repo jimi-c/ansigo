@@ -127,7 +127,7 @@ func (t *Task) Load(data map[interface{}]interface{}) {
   LoadValidFields(t, task_fields, data)
 
   for k, v := range data {
-    if _, ok := ModuleCache[k.(string)]; ok {
+    if _, ok := ModuleCache[k.(string)]; ok || k.(string) == "setup" {
       t.Attr_action = k.(string)
       switch s := TypeOf(v); s {
         case "map":

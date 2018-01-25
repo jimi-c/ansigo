@@ -9,7 +9,7 @@
   - host08
   - host09
   - host10
-  gather_facts: no
+  gather_facts: yes
   serial: [1, 2, 3]
   tasks:
   - name: test foo
@@ -20,7 +20,10 @@
     when: 1 == 1
 
 - hosts: localhost
-  gather_facts: false
+  gather_facts: yes
+  pre_tasks:
+  - debug:
+      msg: "Hi, I'm in the pre_tasks"
   tasks:
   - debug:
       msg: "task outside of a block"
@@ -38,11 +41,19 @@
   - name: block two
     block:
     - debug:
-        msg: "test debug in block 2"
+        msg: "test debug in block 2 before nested block"
     - name: nested block
       block:
       - debug:
           msg: "debug in nested block"
+      always:
+      - debug:
+          msg: "debug in always of nested block"
+    - debug:
+        msg: "debug after nested block"
+  post_tasks:
+  - debug:
+      msg: "Bye, I'm in the post_tasks"
 
 - hosts: localhost
   gather_facts: no

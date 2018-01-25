@@ -32,6 +32,8 @@ type Play struct {
   Become
   Taggable
 
+  // Non-yaml Attributes
+  RemovedHosts map[string]bool
   // role attributes
   //roles []Role
   // block and task lists are read from yaml, but not via
@@ -91,11 +93,38 @@ func (p *Play) Load(data map[interface{}]interface{}) {
 
   LoadValidFields(p, play_fields, data)
 
+  data_pre_tasks, contains_pre_tasks := data["pre_tasks"]
+  if contains_pre_tasks {
+    td, _ := data_pre_tasks.([]interface{})
+    p.Pre_tasks = LoadListOfBlocks(td, p, p, false)
+  }
   data_tasks, contains_tasks := data["tasks"]
   if contains_tasks {
     td, _ := data_tasks.([]interface{})
     p.Tasks = LoadListOfBlocks(td, p, p, false)
   }
+  data_post_tasks, contains_post_tasks := data["post_tasks"]
+  if contains_post_tasks {
+    td, _ := data_post_tasks.([]interface{})
+    p.Post_tasks = LoadListOfBlocks(td, p, p, false)
+  }
+}
+
+func (p *Play) Compile() []Block {
+  flush_meta_data := map[interface{}]interface{} {
+    "meta": "flush_handlers",
+  }
+  flush_block := NewBlock(flush_meta_data, p, nil, false)
+
+  block_list := make([]Block, 0)
+  block_list = append(block_list, p.Pre_tasks...)
+  block_list = append(block_list, *flush_block)
+  // FIXME: roles
+  block_list = append(block_list, p.Tasks...)
+  block_list = append(block_list, *flush_block)
+  block_list = append(block_list, p.Post_tasks...)
+  block_list = append(block_list, *flush_block)
+  return block_list
 }
 
 // local getters
@@ -147,5 +176,6 @@ func (p *Play) Tags() []string {
 func NewPlay(data map[interface{}]interface{}) *Play {
   p := new(Play)
   p.Load(data)
+  p.RemovedHosts = make(map[string]bool)
   return p
 }
