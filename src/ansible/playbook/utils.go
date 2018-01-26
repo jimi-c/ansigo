@@ -1,6 +1,7 @@
 package playbook
 
 import (
+  "fmt"
   "os"
   "path/filepath"
   "strings"
@@ -208,6 +209,32 @@ func Unquote(data string) string {
   return data
 }
 
+func ExtendValue(cur_value []interface{}, new_value []interface{}, prepend bool) []interface{} {
+  fmt.Println("* EXTENDING VALUES:", prepend)
+  fmt.Println("  cur:", cur_value)
+  fmt.Println("  new:", new_value)
+  new_list := make([]interface{}, len(cur_value) + len(new_value))
+  var one []interface{} = nil
+  var two []interface{} = nil
+  if prepend {
+    one = new_value
+    two = cur_value
+  } else {
+    one = cur_value
+    two = new_value
+  }
+  last_i := 0
+  for i, v := range one {
+    new_list[i] = v
+    last_i = i
+  }
+  for i, v := range two {
+    new_list[last_i + i] = v
+  }
+  fmt.Println("- EXTENDED RESULT:", new_list)
+  return new_list
+}
+
 func TypeOf(v interface{}) string {
     switch t := v.(type) {
     case int:
@@ -224,4 +251,13 @@ func TypeOf(v interface{}) string {
       _ = t
       return "unknown"
     }
+}
+
+func StringPos(value string, list []string) int {
+  for p, v := range list {
+    if (v == value) {
+      return p
+    }
+  }
+  return -1
 }

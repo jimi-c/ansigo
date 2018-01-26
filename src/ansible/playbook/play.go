@@ -127,6 +127,10 @@ func (p *Play) Compile() []Block {
   return block_list
 }
 
+func (p *Play) EvaluateTags(only_tags []string, skip_tags []string) bool {
+  return EvaluateTags(p, only_tags, skip_tags)
+}
+
 // local getters
 func (p *Play) Hosts() []string {
   if res, ok := p.Attr_hosts.([]string); ok {

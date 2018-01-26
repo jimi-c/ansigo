@@ -113,12 +113,18 @@ func NewPlayIterator(
   dummy_task_data := make(map[interface{}]interface{})
   dummy_task_data["setup"] = make(map[interface{}]interface{})
   // FIXME: extra setup args here
+  // FIXME: the parsing of the setup task here is not working quite right.
+  //        unsure if this is because of a bug in Task() or a bug here.
   setup_task := playbook.NewTask(dummy_task_data, setup_block)
   setup_block.Attr_block = append(setup_block.Attr_block, setup_task)
 
   iterator.blocks = append(iterator.blocks, *setup_block)
-  // FIXME: filter blocks based on tags here
-  iterator.blocks = append(iterator.blocks, play.Compile()...)
+  for _, block := range play.Compile() {
+    new_block := block.FilterTaggedTasks(play_context)
+    if new_block.HasTasks() {
+      iterator.blocks = append(iterator.blocks, *new_block)
+    }
+  }
 
   //start_at_matched := false
   batch := tqm.Inventory.GetHosts()

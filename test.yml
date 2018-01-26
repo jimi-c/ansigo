@@ -11,6 +11,7 @@
   - host10
   gather_facts: yes
   serial: [1, 2, 3]
+  tags: [a]
   tasks:
   - name: test foo
     debug:
@@ -38,6 +39,7 @@
     - debug:
         msg: "test debug in always of block 1"
     delegate_to: otherhost
+    tags: [a]
   - name: block two
     block:
     - debug:
@@ -51,12 +53,13 @@
           msg: "debug in always of nested block"
     - debug:
         msg: "debug after nested block"
+    tags: [a]
   post_tasks:
   - debug:
       msg: "Bye, I'm in the post_tasks"
 
 - hosts: localhost
-  gather_facts: no
+  gather_facts: yes
   tasks:
   - ping:
   - name: some command

@@ -23,7 +23,7 @@ type Block struct {
   Taggable
 
   // the parent object (a block, or another task)
-  parent *Parent
+  parent Parent
   implicit_block bool
 
   // read from yaml, but loaded recursively by helpers
@@ -63,13 +63,18 @@ func (b *Block) GetInheritedValue(attr string) interface{} {
   }
 
   get_parent_value := field_attribute.Inherit &&
-                      b.parent != nil &&
                       cur_value != reflect.Zero(field.Type()) &&
                       !(b.squashed || b.finalized)
-  if get_parent_value {
-    parent_value := (*b.parent).GetInheritedValue(attr)
-    if parent_value != reflect.Zero(field.Type()) && parent_value != nil {
-      cur_value = parent_value
+  if get_parent_value || field_attribute.Extend {
+    if b.parent != nil {
+      parent_value := b.parent.GetInheritedValue(attr)
+      if parent_value != reflect.Zero(field.Type()) && parent_value != nil {
+        if field_attribute.Extend && cur_value != nil {
+          cur_value = ExtendValue(cur_value.([]interface{}), parent_value.([]interface{}), field_attribute.Prepend)
+        } else {
+          cur_value = parent_value
+        }
+      }
     }
   }
 
@@ -135,6 +140,41 @@ func (b *Block) Copy() *Block {
   return new_block
 }
 
+func (b *Block) EvaluateTags(only_tags []string, skip_tags []string) bool {
+  return EvaluateTags(b, only_tags, skip_tags)
+}
+
+func tag_evaluate_block_target(target []interface{}, play_context *PlayContext) []interface{} {
+  tmp_list := make([]interface{}, 0)
+  for _, thing := range target {
+    if block, ok := thing.(Block); ok {
+      new_block := tag_evaluate_block(&block, play_context)
+      tmp_list = append(tmp_list, *new_block)
+    } else if task, ok := thing.(Task); ok {
+      if task.Attr_action == "meta" ||
+         task.Attr_action == "include" && task.EvaluateTags(make([]string, 0), play_context.Skip_tags) ||
+         task.EvaluateTags(play_context.Only_tags, play_context.Skip_tags) {
+        tmp_list = append(tmp_list, task)
+      }
+    }
+  }
+  return tmp_list
+}
+func tag_evaluate_block(block *Block, play_context *PlayContext) *Block {
+  new_block := block.Copy()
+  new_block.Attr_block = tag_evaluate_block_target(block.Attr_block, play_context)
+  new_block.Attr_rescue = tag_evaluate_block_target(block.Attr_rescue, play_context)
+  new_block.Attr_always = tag_evaluate_block_target(block.Attr_always, play_context)
+  return new_block
+}
+func (b *Block) FilterTaggedTasks(play_context *PlayContext) *Block {
+  return tag_evaluate_block(b, play_context)
+}
+
+func (b *Block) HasTasks() bool {
+  return len(b.Attr_block) > 0 || len(b.Attr_rescue) > 0 || len(b.Attr_always) > 0
+}
+
 // local getters
 func (b *Block) DelegateTo() string {
   if res, ok := b.GetInheritedValue("delegate_to").(string); ok {
@@ -190,7 +230,7 @@ func NewBlock(data map[interface{}]interface{}, play *Play, parent Parent, use_h
   b := new(Block)
   ValidateFields(b, data, false)
   b.Load(data, play, parent, use_handlers)
-  b.parent = &parent
+  b.parent = parent
   b.implicit_block = implicit
 
   return b

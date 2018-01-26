@@ -56,6 +56,7 @@ func (tqm *TaskQueueManager) Run(play *playbook.Play) int {
   // create the play context object and assign it to any callback
   // plugins we've loaded that may need it
   play_context := playbook.NewPlayContext(play, tqm.Options, tqm.Passwords)
+  play_context.Only_tags = append(play_context.Only_tags, "a")
   //for callback_plugin in self._callback_plugins:
   //  if hasattr(callback_plugin, 'set_play_context'):
   //    callback_plugin.set_play_context(play_context)

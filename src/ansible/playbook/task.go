@@ -54,7 +54,7 @@ type Task struct {
   Taggable
 
   // the parent object (a block, or another task)
-  parent *Parent
+  parent Parent
 
   Attr_action interface{}
   Attr_args interface{}
@@ -108,10 +108,14 @@ func (t *Task) GetInheritedValue(attr string) interface{} {
   // FIXME: do append and prepend stuff here too, as well as other
   //        considerations from the python version such as dynamic
   //        includes, etc.
-  if get_parent_value {
-    parent_value := (*t.parent).GetInheritedValue(attr)
+  if get_parent_value || field_attribute.Extend {
+    parent_value := t.parent.GetInheritedValue(attr)
     if parent_value != reflect.Zero(field.Type()) && parent_value != nil {
-      cur_value = parent_value
+      if field_attribute.Extend && cur_value != nil {
+        cur_value = ExtendValue(cur_value.([]interface{}), parent_value.([]interface{}), field_attribute.Prepend)
+      } else {
+        cur_value = parent_value
+      }
     }
   }
 
@@ -142,6 +146,10 @@ func (t *Task) Load(data map[interface{}]interface{}) {
       delete(data, k.(string))
     }
   }
+}
+
+func (t *Task) EvaluateTags(only_tags []string, skip_tags []string) bool {
+  return EvaluateTags(t, only_tags, skip_tags)
 }
 
 // local getters
@@ -278,7 +286,7 @@ func (t *Task) Tags() []string {
 func NewTask(data map[interface{}]interface{}, parent Parent) *Task {
   t := new(Task)
   ValidateFields(t, data, true)
-  t.parent = &parent
+  t.parent = parent
   t.Load(data)
   return t
 }
