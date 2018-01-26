@@ -114,6 +114,27 @@ func (b *Block) Load(data map[interface{}]interface{}, play *Play, parent Parent
   LoadValidFields(b, block_fields, data)
 }
 
+func (b *Block) Copy() *Block {
+  new_block := new(Block)
+  new_block.parent = b.parent
+  new_block.implicit_block = b.implicit_block
+  old_s := reflect.ValueOf(b).Elem()
+  new_s := reflect.ValueOf(new_block).Elem()
+  for k, _ := range b.GetAllObjectFieldAttributes() {
+    field_name := "Attr_" + k
+    old_field := old_s.FieldByName(field_name)
+    new_field := new_s.FieldByName(field_name)
+    new_field.Set(old_field)
+  }
+  new_block.Attr_block = make([]interface{}, len(b.Attr_block))
+  copy(new_block.Attr_block, b.Attr_block)
+  new_block.Attr_rescue = make([]interface{}, len(b.Attr_rescue))
+  copy(new_block.Attr_rescue, b.Attr_rescue)
+  new_block.Attr_always = make([]interface{}, len(b.Attr_always))
+  copy(new_block.Attr_always, b.Attr_always)
+  return new_block
+}
+
 // local getters
 func (b *Block) DelegateTo() string {
   if res, ok := b.GetInheritedValue("delegate_to").(string); ok {

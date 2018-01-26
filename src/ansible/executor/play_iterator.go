@@ -168,8 +168,8 @@ func (it *PlayIterator) GetNextTaskFromState(state *HostState, host inventory.Ho
 
         // Gather facts if the default is 'smart' and we have not yet
         // done it for this host; or if 'explicit' and the play sets
-        // gather_facts to True; or if 'implicit' and the play does
-        // NOT explicitly set gather_facts to False.
+        // gather_facts to true; or if 'implicit' and the play does
+        // NOT explicitly set gather_facts to false.
 
         gathering := "smart" // FIXME: C.DEFAULT_GATHERING
         implied := it.Play.Attr_gather_facts == nil || it.Play.GatherFacts()
@@ -177,7 +177,7 @@ func (it *PlayIterator) GetNextTaskFromState(state *HostState, host inventory.Ho
         // FIXME: below
         //if (gathering == "implicit" and implied) ||
         //   (gathering == "explicit" and it.Play.GatherFacts()) ||
-        //   (gathering == "smart" && implied && !(self._variable_manager._fact_cache.get(host.name, {}).get('module_setup', False))) {
+        //   (gathering == "smart" && implied && !(self._variable_manager._fact_cache.get(host.name, {}).get('module_setup', false))) {
         if (gathering == "implicit" && implied) ||
            (gathering == "explicit" && it.Play.GatherFacts()) ||
            (gathering == "smart" && implied) {
@@ -337,7 +337,7 @@ func (it *PlayIterator) GetNextTaskFromState(state *HostState, host inventory.Ho
             // we're advancing blocks, so if this was an end-of-role block we
             // mark the current role complete
             //if block._eor and host.name in block._role._had_task_run and not in_child and not peek:
-            //    block._role._completed[host.name] = True
+            //    block._role._completed[host.name] = true
           }
         } else {
           thing := cur_block.Attr_always[state.CurAlwaysTask]
@@ -365,9 +365,139 @@ func (it *PlayIterator) GetNextTaskFromState(state *HostState, host inventory.Ho
 }
 
 func (it *PlayIterator) CheckFailedState(state *HostState) bool {
+  if state == nil {
+    return false
+  } else if state.RunState == ITERATING_RESCUE && it.CheckFailedState(state.RescueChildState) {
+    return true
+  } else if state.RunState == ITERATING_ALWAYS && it.CheckFailedState(state.AlwaysChildState) {
+    return true
+  } else if state.FailState != ITERATING_FAILED_NONE {
+    if state.RunState == ITERATING_RESCUE && state.FailState & ITERATING_FAILED_RESCUE == 0 {
+      return false
+    } else if state.RunState == ITERATING_ALWAYS && state.FailState & ITERATING_FAILED_ALWAYS == 0 {
+      return false
+    } else {
+      return !state.DidRescue
+    }
+  } else if state.RunState == ITERATING_TASKS && it.CheckFailedState(state.TasksChildState) {
+    cur_block := state.Blocks[state.CurBlock]
+    if len(cur_block.Attr_rescue) > 0 && state.FailState & ITERATING_FAILED_RESCUE == 0 {
+      return false
+    } else {
+      return true
+    }
+  }
   return false
 }
 
-func (it *PlayIterator) SetFailedState(state *HostState) {
+func (it *PlayIterator) SetFailedState(state *HostState) *HostState {
+  if state.RunState == ITERATING_SETUP {
+    state.FailState |= ITERATING_FAILED_SETUP
+    state.RunState = ITERATING_COMPLETE
+  } else if state.RunState == ITERATING_TASKS {
+    if state.TasksChildState != nil {
+      state.TasksChildState = it.SetFailedState(state.TasksChildState)
+    } else {
+      state.FailState |= ITERATING_FAILED_TASKS
+      cur_block := state.Blocks[state.CurBlock]
+      if len(cur_block.Attr_rescue) > 0 {
+        state.RunState = ITERATING_RESCUE
+      } else if len(cur_block.Attr_always) > 0 {
+        state.RunState = ITERATING_ALWAYS
+      } else {
+        state.RunState = ITERATING_COMPLETE
+      }
+    }
+  } else if state.RunState == ITERATING_RESCUE {
+    if state.RescueChildState != nil {
+      state.RescueChildState = it.SetFailedState(state.RescueChildState)
+    } else {
+      state.FailState |= ITERATING_FAILED_RESCUE
+      cur_block := state.Blocks[state.CurBlock]
+      if len(cur_block.Attr_always) > 0 {
+        state.RunState = ITERATING_ALWAYS
+      } else {
+        state.RunState = ITERATING_COMPLETE
+      }
+    }
+  } else if state.RunState == ITERATING_ALWAYS {
+    if state.AlwaysChildState != nil {
+      state.AlwaysChildState = it.SetFailedState(state.AlwaysChildState)
+    } else {
+      state.FailState |= ITERATING_FAILED_ALWAYS
+      state.RunState = ITERATING_COMPLETE
+    }
+  }
+  return state
+}
 
+func (it *PlayIterator) MarkHostFailed(host inventory.Host) {
+  s := it.GetHostState(host)
+  s = it.SetFailedState(s)
+  it.HostStates[host.Name] = s
+  it.Play.RemovedHosts[host.Name] = true
+}
+
+func (it *PlayIterator) IsFailed(host inventory.Host) bool {
+  s := it.GetHostState(host)
+  return it.CheckFailedState(s)
+}
+
+func (it *PlayIterator) AddTasks(host inventory.Host, block_list []interface{}) {
+  it.HostStates[host.Name] = it.InsertBlocksIntoState(it.GetHostState(host), block_list)
+}
+
+func (it *PlayIterator) InsertBlocksIntoState(state *HostState, block_list []interface{}) *HostState {
+  // if we've failed at all, or if the task list is empty, just return the current state
+  if state.FailState != ITERATING_FAILED_NONE &&
+     state.RunState != ITERATING_RESCUE &&
+     state.RunState != ITERATING_ALWAYS ||
+     len(block_list) == 0 {
+    return state
+  }
+
+  if state.RunState == ITERATING_TASKS {
+    if state.TasksChildState != nil {
+      state.TasksChildState = it.InsertBlocksIntoState(state.TasksChildState, block_list)
+    } else {
+      target_block := state.Blocks[state.CurBlock].Copy()
+      before := target_block.Attr_block[:state.CurRegularTask]
+      after := target_block.Attr_block[state.CurRegularTask:]
+      new_list := make([]interface{}, 0)
+      new_list = append(new_list, before...)
+      new_list = append(new_list, block_list...)
+      new_list = append(new_list, after...)
+      target_block.Attr_block = new_list
+      state.Blocks[state.CurBlock] = *target_block
+    }
+  } else if state.RunState == ITERATING_RESCUE {
+    if state.RescueChildState != nil {
+      state.RescueChildState = it.InsertBlocksIntoState(state.RescueChildState, block_list)
+    } else {
+      target_block := state.Blocks[state.CurBlock].Copy()
+      before := target_block.Attr_rescue[:state.CurRescueTask]
+      after := target_block.Attr_rescue[state.CurRescueTask:]
+      new_list := make([]interface{}, 0)
+      new_list = append(new_list, before...)
+      new_list = append(new_list, block_list...)
+      new_list = append(new_list, after...)
+      target_block.Attr_rescue = new_list
+      state.Blocks[state.CurBlock] = *target_block
+    }
+  } else if state.RunState == ITERATING_ALWAYS {
+    if state.AlwaysChildState != nil {
+      state.AlwaysChildState = it.InsertBlocksIntoState(state.AlwaysChildState, block_list)
+    } else {
+      target_block := state.Blocks[state.CurBlock].Copy()
+      before := target_block.Attr_always[:state.CurAlwaysTask]
+      after := target_block.Attr_always[state.CurAlwaysTask:]
+      new_list := make([]interface{}, 0)
+      new_list = append(new_list, before...)
+      new_list = append(new_list, block_list...)
+      new_list = append(new_list, after...)
+      target_block.Attr_always = new_list
+      state.Blocks[state.CurBlock] = *target_block
+    }
+  }
+  return state
 }
