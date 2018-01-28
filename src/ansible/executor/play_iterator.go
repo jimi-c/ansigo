@@ -108,15 +108,15 @@ func NewPlayIterator(
   iterator.var_manager = tqm.VarManager
   iterator.HostStates = make(map[string]*HostState)
 
+  // FIXME: there's a bug in block parsing where an empty
+  //        block is getting one task regardless.
   dummy_block_data := make(map[interface{}]interface{})
   setup_block := playbook.NewBlock(dummy_block_data, play, nil, false)
   dummy_task_data := make(map[interface{}]interface{})
   dummy_task_data["setup"] = make(map[interface{}]interface{})
   // FIXME: extra setup args here
-  // FIXME: the parsing of the setup task here is not working quite right.
-  //        unsure if this is because of a bug in Task() or a bug here.
   setup_task := playbook.NewTask(dummy_task_data, setup_block)
-  setup_block.Attr_block = append(setup_block.Attr_block, setup_task)
+  setup_block.Attr_block = []interface{} {*setup_task}
 
   iterator.blocks = append(iterator.blocks, *setup_block)
   for _, block := range play.Compile() {

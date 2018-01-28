@@ -152,6 +152,10 @@ func (t *Task) EvaluateTags(only_tags []string, skip_tags []string) bool {
   return EvaluateTags(t, only_tags, skip_tags)
 }
 
+func (t *Task) EvaluateConditional() bool {
+  return EvaluateConditional(t)
+}
+
 // local getters
 func (t *Task) Action() string {
   if res, ok := t.Attr_action.(string); ok {

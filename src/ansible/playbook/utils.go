@@ -8,8 +8,8 @@ import (
 )
 
 type ModuleInfo struct {
-  name string
-  path string
+  Name string
+  Path string
 }
 
 var ModuleCache = make(map[string]ModuleInfo)
@@ -25,7 +25,8 @@ func enumerateDirectory(path string, info os.FileInfo, err error) error {
   if info.IsDir() {
     filepath.Walk(path + info.Name(), enumerateDirectory)
   } else {
-    abs_path, _ := filepath.Abs(path + info.Name())
+    // FIXME: error handling?
+    abs_path, _ := filepath.Abs(path)
     ModuleCache[strings.TrimSuffix(info.Name(), filepath.Ext(info.Name()))] = ModuleInfo{info.Name(), abs_path}
   }
   return nil

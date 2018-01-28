@@ -1,6 +1,7 @@
 package executor
 
 import (
+  "fmt"
   "strconv"
   "strings"
 )
@@ -21,4 +22,13 @@ func PctToInt(value interface{}, num_items int, min_value int) int {
   }
 
   return pct
+}
+
+// simple helper to format a string with a map
+// FIXME: should probably be in a higher level utils
+func Tprintf(format string, params map[string]interface{}) string {
+	for key, val := range params {
+		format = strings.Replace(format, "%{"+key+"}s", fmt.Sprintf("%s", val), -1)
+	}
+	return format
 }

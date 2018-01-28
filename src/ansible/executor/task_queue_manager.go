@@ -13,6 +13,15 @@ const TQM_RUN_UNREACHABLE_HOSTS = 4
 const TQM_RUN_FAILED_BREAK_PLAY = 8
 const TQM_RUN_UNKNOWN_ERROR = 255
 
+type WorkerSlot struct {
+  res <-chan TaskResult
+}
+
+type WorkerJob struct {
+  Host inventory.Host
+  Task playbook.Task
+}
+
 type CallbackArgs struct {
   what interface{}
 }
@@ -36,6 +45,10 @@ type TaskQueueManager struct {
   callbacks_loaded bool
   callback_plugins []interface{} // FIXME
   run_additional_callbacks bool
+  // go routine stuff
+  workers []WorkerSlot
+  work_queue chan WorkerJob
+  result_queue chan TaskResult
 }
 
 func (tqm *TaskQueueManager) LoadCallbacks() {
@@ -56,7 +69,6 @@ func (tqm *TaskQueueManager) Run(play *playbook.Play) int {
   // create the play context object and assign it to any callback
   // plugins we've loaded that may need it
   play_context := playbook.NewPlayContext(play, tqm.Options, tqm.Passwords)
-  play_context.Only_tags = append(play_context.Only_tags, "a")
   //for callback_plugin in self._callback_plugins:
   //  if hasattr(callback_plugin, 'set_play_context'):
   //    callback_plugin.set_play_context(play_context)
@@ -66,11 +78,28 @@ func (tqm *TaskQueueManager) Run(play *playbook.Play) int {
   iterator := NewPlayIterator(tqm, play, play_context, make(map[string]interface{}))
   host := tqm.Inventory.GetHosts()[0]
 
+  pending_tasks := 0
   for s, t := iterator.GetNextTaskForHost(host, false); s.RunState != ITERATING_COMPLETE; s, t = iterator.GetNextTaskForHost(host, false) {
-    fmt.Println("- TASK:", t)
+    if t.Action() == "meta" {
+      fmt.Println("META TASK:", t)
+    } else {
+      tqm.QueueTask(host, *t)
+      pending_tasks += 1
+      for pending_tasks > 0 {
+        res := <-tqm.result_queue
+        fmt.Println(res)
+        pending_tasks -= 1
+      }
+    }
   }
   fmt.Println("TASK ITERATION COMPLETE FOR HOST: ", host)
   return TQM_RUN_OK
+}
+
+func (tqm *TaskQueueManager) QueueTask(host inventory.Host, task playbook.Task) {
+  job := WorkerJob{host, task}
+  tqm.work_queue <- job
+  fmt.Println("- queued task")
 }
 
 func NewTaskQueueManager(inventory *inventory.InventoryManager, run_additional_callbacks bool) *TaskQueueManager {
@@ -80,5 +109,25 @@ func NewTaskQueueManager(inventory *inventory.InventoryManager, run_additional_c
   tqm.StartAtDone = false
   tqm.callbacks_loaded = false
   tqm.run_additional_callbacks = run_additional_callbacks
+  tqm.work_queue = make(chan WorkerJob, 5)
+  tqm.result_queue = make(chan TaskResult, 5)
+  tqm.workers = make([]WorkerSlot, 5)
+  for i := 0; i < 5; i++ {
+    res_chan := make(chan TaskResult)
+    tqm.workers[i] = WorkerSlot{res_chan}
+    // fan-out to the workers
+    go func() {
+      for n := range tqm.work_queue {
+        te := NewTaskExecutor(n.Host, n.Task)
+        res_chan <- te.Run()
+      }
+    }()
+    // fan-in the workers results to a single queue
+    go func() {
+      for n := range res_chan {
+        tqm.result_queue <- n
+      }
+    }()
+  }
   return tqm
 }

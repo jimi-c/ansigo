@@ -151,8 +151,8 @@ func tag_evaluate_block_target(target []interface{}, play_context *PlayContext) 
       new_block := tag_evaluate_block(&block, play_context)
       tmp_list = append(tmp_list, *new_block)
     } else if task, ok := thing.(Task); ok {
-      if task.Attr_action == "meta" ||
-         task.Attr_action == "include" && task.EvaluateTags(make([]string, 0), play_context.Skip_tags) ||
+      if task.Action() == "meta" ||
+         task.Action() == "include" && task.EvaluateTags(make([]string, 0), play_context.Skip_tags) ||
          task.EvaluateTags(play_context.Only_tags, play_context.Skip_tags) {
         tmp_list = append(tmp_list, task)
       }
