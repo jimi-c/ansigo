@@ -23,39 +23,49 @@
 - hosts: localhost
   gather_facts: yes
   pre_tasks:
-  - debug:
+  - name: pre task
+    debug:
       msg: "Hi, I'm in the pre_tasks"
   tasks:
-  - debug:
+  - name: outside block
+    debug:
       msg: "task outside of a block"
   - name: block one
     block:
-    - debug:
+    - name: block 1 main debug
+      debug:
         msg: "test debug in block 1"
     rescue:
-    - debug:
+    - name: block 1 rescue debug
+      debug:
         msg: "test debug in rescue of block 1"
     always:
-    - debug:
+    - name: block 1 always debug
+      debug:
         msg: "test debug in always of block 1"
     delegate_to: otherhost
     tags: [a]
   - name: block two
     block:
-    - debug:
+    - name: block 2 before nested block
+      debug:
         msg: "test debug in block 2 before nested block"
     - name: nested block
       block:
-      - debug:
+      - name: debug in nested block main
+        debug:
           msg: "debug in nested block"
       always:
-      - debug:
+      - name: debug in nested block always
+        debug:
           msg: "debug in always of nested block"
-    - debug:
+    - name: block 2 after nested block
+      debug:
         msg: "debug after nested block"
     tags: [a]
   post_tasks:
-  - debug:
+  - name: post task
+    debug:
       msg: "Bye, I'm in the post_tasks"
 
 - hosts: localhost
