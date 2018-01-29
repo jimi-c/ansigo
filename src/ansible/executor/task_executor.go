@@ -146,7 +146,12 @@ func (te *TaskExecutor) GetConnection() plugins.ConnectionInterface {
 }
 
 func (te *TaskExecutor) GetActionHandler(connection plugins.ConnectionInterface) plugins.ActionInterface {
-  handler := plugins.LoadActionPlugin("normal")
+  var handler plugins.ActionInterface
+  if plugins.PluginExists(te.Task.Action(), "action") {
+    handler = plugins.LoadActionPlugin(te.Task.Action())
+  } else {
+    handler = plugins.LoadActionPlugin("normal")
+  }
   handler.SetConnection(connection)
   return handler
 }

@@ -1,10 +1,20 @@
 package plugins
 
 import (
+  "os"
   "plugin"
   "strings"
   "ansible/playbook"
 )
+
+func PluginExists(name string, class string) bool {
+  exPath := GetExecutableDir()
+  mod_name := exPath + "/plugins/" + class + "/" + name + ".so"
+  if _, err := os.Lstat(mod_name); err != nil {
+    return false
+  }
+  return true
+}
 
 func LoadPlugin(name string, class string) interface{} {
   exPath := GetExecutableDir()
