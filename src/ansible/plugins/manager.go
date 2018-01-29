@@ -1,19 +1,13 @@
 package plugins
 
 import (
-  "path/filepath"
-  "os"
   "plugin"
   "strings"
   "ansible/playbook"
 )
 
 func LoadPlugin(name string, class string) interface{} {
-  ex, err := os.Executable()
-  if err != nil {
-      panic(err)
-  }
-  exPath := filepath.Dir(ex)
+  exPath := GetExecutableDir()
   mod_name := exPath + "/plugins/" + class + "/" + name + ".so"
   mod, err := plugin.Open(mod_name)
   if err != nil {

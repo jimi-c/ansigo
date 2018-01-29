@@ -12,7 +12,11 @@ type ActionPlugin struct {
 
 func (a *ActionPlugin) Run(task playbook.Task, variables map[string]interface{}) map[string]interface{} {
   a.Initialize(task, variables)
-  return action_base.ExecuteModule(a, "", task.Args(), "/tmp", nil)
+  if task.Action() == "debug" {
+    return map[string]interface{}{"msg": "debugged"}
+  } else {
+    return action_base.ExecuteModule(a, "", task.Args(), "/tmp", nil)
+  }
 }
 
 var Action ActionPlugin

@@ -7,7 +7,13 @@ import (
   "encoding/json"
   "io"
   "io/ioutil"
+  "os"
+  "path"
+  "path/filepath"
+  "regexp"
+  "strings"
   "ansible/playbook"
+  "ansible/plugins"
 )
 
 const ANSIBALLZ_TEMPLATE = `%{shebang}s
@@ -275,15 +281,15 @@ if __name__ == '__main__':
             z = zipfile.ZipFile(zipped_mod, mode='a')
 
             # py3: zipped_mod will be text, py2: it's bytes.  Need bytes at the end
-            sitecustomize = u'import sys\\nsys.path.insert(0,"%s")\\n' % zipped_mod
-            sitecustomize = sitecustomize.encode('utf-8')
+            #sitecustomize = u'import sys\\nsys.path.insert(0,"%s")\\n' % zipped_mod
+            #sitecustomize = sitecustomize.encode('utf-8')
             # Use a ZipInfo to work around zipfile limitation on hosts with
             # clocks set to a pre-1980 year (for instance, Raspberry Pi)
-            zinfo = zipfile.ZipInfo()
-            zinfo.filename = 'sitecustomize.py'
-            zinfo.date_time = ( %{year}s, %{month}s, %{day}s, %{hour}s, %{minute}s, %{second}s)
-            z.writestr(zinfo, sitecustomize)
-            z.close()
+            #zinfo = zipfile.ZipInfo()
+            #zinfo.filename = 'sitecustomize.py'
+            #zinfo.date_time = ( %{year}s, %{month}s, %{day}s, %{hour}s, %{minute}s, %{second}s)
+            #z.writestr(zinfo, sitecustomize)
+            #z.close()
 
             exitcode = invoke_module(module, zipped_mod, ANSIBALLZ_PARAMS)
     finally:
@@ -295,6 +301,91 @@ if __name__ == '__main__':
     sys.exit(exitcode)
 `
 var CompiledModuleCache map[string]string = make(map[string]string)
+var re = regexp.MustCompile("ansible\\.module_utils\\.([\\w.]+)+")
+
+func CompileDependencies(data string, dependencies []string, archive *zip.Writer) []string {
+  exPath := plugins.GetExecutableDir()
+  matches := re.FindAllString(data, -1)
+  replacer := strings.NewReplacer("ansible.", "", ".", string(os.PathSeparator))
+  for _, match := range matches {
+    // FIXME: this needs to be read from a well-known module path
+    //        instead of relative to the binary executable
+    target_path := path.Join(exPath, "..", "modules", replacer.Replace(match))
+    stat, err := os.Lstat(target_path)
+    // if the path is a directory, use CompileDependencies recursively
+    if err == nil && stat.IsDir() {
+      // walk the dir and all of the files to the zip
+      if playbook.StringPos(target_path, dependencies) != -1 {
+        continue
+      }
+      filepath.Walk(target_path, func(path string, info os.FileInfo, err error) error {
+        if err != nil {
+          return err
+        }
+        header, err := zip.FileInfoHeader(info)
+        if err != nil {
+          return err
+        }
+        parts := strings.Split(match, ".")
+        header.Name = filepath.Join("ansible", "module_utils", parts[len(parts)-1], strings.TrimPrefix(path, target_path))
+        if info.IsDir() {
+          header.Name += "/"
+        } else {
+          header.Method = zip.Deflate
+        }
+        if playbook.StringPos(header.Name, dependencies) != -1 {
+          return nil
+        }
+        dependencies = append(dependencies, header.Name)
+        writer, err := archive.CreateHeader(header)
+        if err != nil {
+          return err
+        }
+        if info.IsDir() {
+          // FIXME: recurse into sub directories?
+          return nil
+        }
+        file, err := os.Open(path)
+        if err != nil {
+          return err
+        }
+        defer file.Close()
+        _, err = io.Copy(writer, file)
+        return err
+      })
+    } else {
+      // otherwise, if the path exists with a .py extension, add it to the zip
+      py_path := target_path + ".py"
+      if _, err := os.Lstat(py_path); err != nil {
+        parts := strings.Split(match, ".")
+        py_path = path.Join(exPath, "..", "modules", path.Join(parts[1:len(parts)-1]...) + ".py")
+        if _, err := os.Lstat(py_path); err != nil {
+          // FIXME: error handling
+          continue
+        }
+        match = strings.Join(parts[1:len(parts)-1], ".")
+      }
+      dep_data, err := ioutil.ReadFile(py_path)
+      if err != nil {
+        // FIXME: error handling
+      }
+      // split original match on .'s and remove the last one
+      replacer := strings.NewReplacer(".", string(os.PathSeparator))
+      archive_path := replacer.Replace(match) + ".py"
+      if playbook.StringPos(archive_path, dependencies) != -1 {
+        continue
+      }
+      dependencies = append(dependencies, archive_path)
+      writer, err := archive.Create(archive_path)
+      if err != nil {
+        // FIXME: handle error
+      }
+      io.Copy(writer, bytes.NewReader(dep_data))
+      dependencies = CompileDependencies(string(dep_data), dependencies, archive)
+    }
+  }
+  return dependencies
+}
 
 func CompileModule(name string, args map[string]interface{}) string {
   module_info, ok := playbook.ModuleCache[name]
@@ -314,11 +405,41 @@ func CompileModule(name string, args map[string]interface{}) string {
       // FIXME: handle error
     }
 
-    writer, err := archive.Create("ansible_module_" + name + ".py")
-    if err != nil {
+    if writer, err := archive.Create("ansible_module_" + name + ".py"); err != nil {
       // FIXME: handle error
+    } else {
+      io.Copy(writer, bytes.NewReader(data))
     }
-    io.Copy(writer, bytes.NewReader(data))
+    // create base init files
+    for _, f_name := range []string{"ansible/__init__.py", "ansible/module_utils/__init__.py"} {
+      if writer, err := archive.Create(f_name); err != nil {
+        // FIXME: handle error
+      } else {
+        io.Copy(writer, bytes.NewReader([]byte{}))
+      }
+    }
+
+    dependencies := make([]string, 0)
+    dependencies = CompileDependencies(string(data), dependencies, archive)
+
+    // Add inits for any directories created while archiving
+    // dependencies, but for which were not already included
+    inits := make([]string, 0)
+    for _, dep := range dependencies {
+      for dep_dir := path.Dir(dep); dep_dir != "."; dep_dir = path.Dir(dep_dir) {
+        init := path.Join(dep_dir, "__init__.py")
+        if playbook.StringPos(init, dependencies) != -1 || playbook.StringPos(init, inits) != -1 {
+          continue
+        } else {
+          if writer, err := archive.Create(init); err != nil {
+            // FIXME: handle error
+          } else {
+            io.Copy(writer, bytes.NewReader([]byte{}))
+          }
+          inits = append(inits, init)
+        }
+      }
+    }
     archive.Close()
 
     zipped_data = base64.StdEncoding.EncodeToString(out_buffer.Bytes())
@@ -346,6 +467,7 @@ func CompileModule(name string, args map[string]interface{}) string {
     "minute": "0",
     "second": "0",
   }
-  formated_string := Tprintf(ANSIBALLZ_TEMPLATE, formatting_params)
-  return formated_string
+  formatted_string := Tprintf(ANSIBALLZ_TEMPLATE, formatting_params)
+  ioutil.WriteFile("/tmp/module_" + name + ".py", []byte(formatted_string), 0644)
+  return formatted_string
 }
