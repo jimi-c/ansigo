@@ -135,13 +135,25 @@ func (t *Task) Load(data map[interface{}]interface{}) {
       t.Attr_action = k.(string)
       switch s := TypeOf(v); s {
         case "map":
-          t.Attr_args = v.(map[interface{}] interface{})
+          args := make(map[string]interface{})
+          if arg_map, ok := v.(map[interface{}]interface{}); ok {
+            for k, v := range arg_map {
+              if str_k, ok := k.(string); ok {
+                args[str_k] = v
+              } else {
+                // FIXME: error handling
+              }
+            }
+          } else {
+            // FIXME: error handling
+          }
+          t.Attr_args = args
         case "string":
           raw_modules := map[string]string{"command":"", "shell":"", "script":""}
           _, check_raw := raw_modules[k.(string)]
           t.Attr_args = ParseKV(v.(string), check_raw)
         default:
-          t.Attr_args = make(map[interface{}] interface{})
+          t.Attr_args = make(map[string]interface{})
       }
       delete(data, k.(string))
     }
@@ -163,11 +175,14 @@ func (t *Task) Action() string {
   }
   return ""
 }
-func (t *Task) Args() map[interface{}]interface{} {
-  if res, ok := t.Attr_args.(map[interface{}]interface{}); ok {
-    return res
+func (t *Task) Args() map[string]interface{} {
+  args := make(map[string]interface{})
+  if res, ok := t.Attr_args.(map[string]interface{}); ok {
+    args = res
+  } else {
+    // FIXME: error handling
   }
-  return make(map[interface{}]interface{})
+  return args
 }
 func (t *Task) AsyncVal() int {
   if res, ok := t.GetInheritedValue("async_val").(int); ok {

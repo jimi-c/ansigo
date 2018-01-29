@@ -4,6 +4,7 @@ import (
   "archive/zip"
   "bytes"
   "encoding/base64"
+  "encoding/json"
   "io"
   "io/ioutil"
   "ansible/playbook"
@@ -244,7 +245,7 @@ if __name__ == '__main__':
     # See comments in the debug() method for information on debugging
     #
 
-    ANSIBALLZ_PARAMS = '%{params}s'
+    ANSIBALLZ_PARAMS = '''%{params}s'''
     if PY3:
         ANSIBALLZ_PARAMS = ANSIBALLZ_PARAMS.encode('utf-8')
     try:
@@ -325,12 +326,19 @@ func CompileModule(name string, args map[string]interface{}) string {
   }
 
   var params = map[string]interface{} {
+    "ANSIBLE_MODULE_ARGS": args,
+  }
+  encoded_params, err := json.Marshal(params)
+  if err != nil {
+    // FIXME: handle error
+  }
+  var formatting_params = map[string]interface{} {
     "module_name": name,
     "shebang": "#!/usr/bin/python",
     "interpreter": "/usr/bin/python",
     "encoding": "# -*- coding: utf-8 -*-",
     "zipped_data": zipped_data,
-    "params": "{\"ANSIBLE_MODULE_ARGS\": {}}",
+    "params": string(encoded_params),
     "year": "2018",
     "month": "1",
     "day": "1",
@@ -338,6 +346,6 @@ func CompileModule(name string, args map[string]interface{}) string {
     "minute": "0",
     "second": "0",
   }
-  formated_string := Tprintf(ANSIBALLZ_TEMPLATE, params)
+  formated_string := Tprintf(ANSIBALLZ_TEMPLATE, formatting_params)
   return formated_string
 }

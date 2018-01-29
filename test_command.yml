@@ -1,0 +1,7 @@
+- hosts: all
+  gather_facts: no
+  tasks:
+  - command: "echo 'hello'"
+  - command:
+      _raw_params: "echo hello"
+

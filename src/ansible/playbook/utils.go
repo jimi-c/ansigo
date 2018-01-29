@@ -1,7 +1,6 @@
 package playbook
 
 import (
-  "fmt"
   "os"
   "path/filepath"
   "strings"
@@ -173,8 +172,8 @@ func SplitArgString(args string) []string {
   return params
 }
 
-func ParseKV(args string, check_raw bool) map[string]string {
-  options := make(map[string]string)
+func ParseKV(args string, check_raw bool) map[string]interface{} {
+  options := make(map[string]interface{})
   vargs := SplitArgString(args)
 
   raw_params := make([]string, 0)
@@ -211,9 +210,6 @@ func Unquote(data string) string {
 }
 
 func ExtendValue(cur_value []interface{}, new_value []interface{}, prepend bool) []interface{} {
-  fmt.Println("* EXTENDING VALUES:", prepend)
-  fmt.Println("  cur:", cur_value)
-  fmt.Println("  new:", new_value)
   new_list := make([]interface{}, len(cur_value) + len(new_value))
   var one []interface{} = nil
   var two []interface{} = nil
@@ -232,7 +228,6 @@ func ExtendValue(cur_value []interface{}, new_value []interface{}, prepend bool)
   for i, v := range two {
     new_list[last_i + i] = v
   }
-  fmt.Println("- EXTENDED RESULT:", new_list)
   return new_list
 }
 
