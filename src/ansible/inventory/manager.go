@@ -8,15 +8,15 @@ type InventoryManager struct {
 
 func (im *InventoryManager) GetHosts() []Host {
   return []Host{
-    Host{"host01"},
-    Host{"host02"},
-    Host{"host03"},
-    Host{"host04"},
-    Host{"host05"},
-    Host{"host06"},
-    Host{"host07"},
-    Host{"host08"},
-    Host{"host09"},
-    Host{"host10"},
+    *NewHost("host01", nil),
+    *NewHost("host02", nil),
+    *NewHost("host03", nil),
+    *NewHost("host04", nil),
+    *NewHost("host05", nil),
+    *NewHost("host06", nil),
+    *NewHost("host07", nil),
+    *NewHost("host08", nil),
+    *NewHost("host09", nil),
+    *NewHost("host10", nil),
   }
 }

@@ -96,7 +96,7 @@ func (pbe *PlaybookExecutor) GetSerializedBatches(play playbook.Play) [][]invent
   all_hosts := make([]inventory.Host, 0)
   // FIXME: stub to create inventory
   for _, h := range play.Hosts() {
-    all_hosts = append(all_hosts, inventory.Host{h})
+    all_hosts = append(all_hosts, *inventory.NewHost(h, nil))
   }
   all_hosts_len := len(all_hosts)
 
