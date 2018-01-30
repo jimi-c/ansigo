@@ -130,6 +130,15 @@ func (t *Task) Load(data map[interface{}]interface{}) {
 
   LoadValidFields(t, task_fields, data)
 
+  t.Base.GetInheritedValue = t.GetInheritedValue
+  t.Base.GetAllObjectFieldAttributes = t.GetAllObjectFieldAttributes
+  t.Conditional.GetInheritedValue = t.GetInheritedValue
+  t.Conditional.GetAllObjectFieldAttributes = t.GetAllObjectFieldAttributes
+  t.Taggable.GetInheritedValue = t.GetInheritedValue
+  t.Taggable.GetAllObjectFieldAttributes = t.GetAllObjectFieldAttributes
+  t.Become.GetInheritedValue = t.GetInheritedValue
+  t.Become.GetAllObjectFieldAttributes = t.GetAllObjectFieldAttributes
+
   for k, v := range data {
     if _, ok := ModuleCache[k.(string)]; ok || k.(string) == "setup" {
       t.Attr_action = k.(string)
@@ -277,26 +286,6 @@ func (t *Task) Until() []string {
     return res
   } else {
     res, _ := task_fields["until"].Default.([]string)
-    return res
-  }
-}
-// base mixin getters
-// become mixin getters
-// conditional mixin getters
-func (t *Task) When() []string {
-  if res, ok := t.GetInheritedValue("when").([]string); ok {
-    return res
-  } else {
-    res, _ := conditional_fields["when"].Default.([]string)
-    return res
-  }
-}
-// taggable mixin getters
-func (t *Task) Tags() []string {
-  if res, ok := t.GetInheritedValue("tags").([]string); ok {
-    return res
-  } else {
-    res, _ := taggable_fields["tags"].Default.([]string)
     return res
   }
 }

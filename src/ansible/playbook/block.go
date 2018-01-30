@@ -25,12 +25,10 @@ type Block struct {
   // the parent object (a block, or another task)
   parent Parent
   implicit_block bool
-
   // read from yaml, but loaded recursively by helpers
   Attr_block []interface{}
   Attr_rescue []interface{}
   Attr_always []interface{}
-
   // attributes read from yaml directly
   Attr_delegate_to interface{}
   Attr_delegate_facts interface{}
@@ -86,6 +84,15 @@ func (b *Block) Load(data map[interface{}]interface{}, play *Play, parent Parent
   b.Conditional.Load(data)
   b.Taggable.Load(data)
   b.Become.Load(data)
+
+  b.Base.GetInheritedValue = b.GetInheritedValue
+  b.Base.GetAllObjectFieldAttributes = b.GetAllObjectFieldAttributes
+  b.Conditional.GetInheritedValue = b.GetInheritedValue
+  b.Conditional.GetAllObjectFieldAttributes = b.GetAllObjectFieldAttributes
+  b.Taggable.GetInheritedValue = b.GetInheritedValue
+  b.Taggable.GetAllObjectFieldAttributes = b.GetAllObjectFieldAttributes
+  b.Become.GetInheritedValue = b.GetInheritedValue
+  b.Become.GetAllObjectFieldAttributes = b.GetAllObjectFieldAttributes
 
   data_block, contains_block := data["block"]
   data_rescue, contains_rescue := data["rescue"]
@@ -152,8 +159,8 @@ func tag_evaluate_block_target(target []interface{}, play_context *PlayContext) 
       tmp_list = append(tmp_list, *new_block)
     } else if task, ok := thing.(Task); ok {
       if task.Action() == "meta" ||
-         task.Action() == "include" && task.EvaluateTags(make([]string, 0), play_context.Skip_tags) ||
-         task.EvaluateTags(play_context.Only_tags, play_context.Skip_tags) {
+         task.Action() == "include" && task.EvaluateTags(make([]string, 0), play_context.Skip_tags()) ||
+         task.EvaluateTags(play_context.Only_tags(), play_context.Skip_tags()) {
         tmp_list = append(tmp_list, task)
       }
     }
@@ -189,26 +196,6 @@ func (b *Block) DelegateFacts() bool {
     return res
   } else {
     res, _ := block_fields["delegate_facts"].Default.(bool)
-    return res
-  }
-}
-// base mixin getters
-// become mixin getters
-// conditional mixin getters
-func (b *Block) When() []string {
-  if res, ok := b.GetInheritedValue("when").([]string); ok {
-    return res
-    } else {
-      res, _ := conditional_fields["when"].Default.([]string)
-      return res
-    }
-  }
-// taggable mixin getters
-func (b *Block) Tags() []string {
-  if res, ok := b.GetInheritedValue("tags").([]string); ok {
-    return res
-  } else {
-    res, _ := taggable_fields["tags"].Default.([]string)
     return res
   }
 }

@@ -23,7 +23,7 @@ var play_fields = map[string]FieldAttribute{
   "force_handlers": FieldAttribute{T:"bool", Default: false},
   "max_fail_percentage": FieldAttribute{T:"float64", Default: 0.0},
   "serial": FieldAttribute{T:"list", Default: nil, ListOf: "int"},
-  "strategy": FieldAttribute{T:"string", Default: nil},
+  "strategy": FieldAttribute{T:"string", Default: "linear"},
   "order": FieldAttribute{T:"string", Default: nil},
 }
 
@@ -88,8 +88,16 @@ func (p *Play) GetInheritedValue(attr string) interface{} {
 }
 
 func (p *Play) Load(data map[interface{}]interface{}) {
+  p.Base.Load(data)
   p.Taggable.Load(data)
   p.Become.Load(data)
+
+  p.Base.GetInheritedValue = p.GetInheritedValue
+  p.Base.GetAllObjectFieldAttributes = p.GetAllObjectFieldAttributes
+  p.Taggable.GetInheritedValue = p.GetInheritedValue
+  p.Taggable.GetAllObjectFieldAttributes = p.GetAllObjectFieldAttributes
+  p.Become.GetInheritedValue = p.GetInheritedValue
+  p.Become.GetAllObjectFieldAttributes = p.GetAllObjectFieldAttributes
 
   LoadValidFields(p, play_fields, data)
 
@@ -164,18 +172,6 @@ func (p *Play) Serial() []int {
     return res
   }
 }
-// base mixin getters
-// become mixin getters
-// taggable mixin getters
-func (p *Play) Tags() []string {
-  if res, ok := p.Attr_tags.([]string); ok {
-    return res
-  } else {
-    res, _ := taggable_fields["tags"].Default.([]string)
-    return res
-  }
-}
-
 
 func NewPlay(data map[interface{}]interface{}) *Play {
   p := new(Play)

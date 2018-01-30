@@ -12,10 +12,23 @@ var taggable_fields = map[string]FieldAttribute{
 
 type Taggable struct {
   Attr_tags interface{}
+  // methods we override from the top-level composed class
+  GetInheritedValue func (string) interface{}
+  GetAllObjectFieldAttributes func() map[string]FieldAttribute
 }
 
 func (t *Taggable) Load(data map[interface{}]interface{}) {
   LoadValidFields(t, taggable_fields, data)
+}
+
+// taggable mixin getters
+func (t *Taggable) Tags() []string {
+  if res, ok := t.GetInheritedValue("tags").([]string); ok {
+    return res
+  } else {
+    res, _ := taggable_fields["tags"].Default.([]string)
+    return res
+  }
 }
 
 func Disjoint(a []string, b []string) bool {

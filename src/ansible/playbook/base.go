@@ -157,7 +157,20 @@ func PostValidate(thing Validateable) Validateable {
 // The base struct and related methods/etc.
 
 var base_fields = map[string]FieldAttribute{
-  "name": FieldAttribute{T: "string", Default: ""},
+  "name": FieldAttribute{T: "string", Default: "", Required: false, Priority: 0, Inherit: true, Alias: []string{}, Extend: false, Prepend: false,},
+  "connection": FieldAttribute{T: "string", Default: "smart", Required: false, Priority: 0, Inherit: true, Alias: []string{}, Extend: false, Prepend: false,},
+  "port": FieldAttribute{T: "int", Default: 22, Required: false, Priority: 0, Inherit: true, Alias: []string{}, Extend: false, Prepend: false,},
+  "remote_user": FieldAttribute{T: "string", Default: "", Required: false, Priority: 0, Inherit: true, Alias: []string{}, Extend: false, Prepend: false,},
+  "vars": FieldAttribute{T: "map", Default: nil, Priority: 100, Inherit: false, Required: false, Alias: []string{}, Extend: false, Prepend: false,},
+  "environment": FieldAttribute{T: "map", Default: nil, Extend: true, Prepend: true, Required: false, Priority: 0, Inherit: true, Alias: []string{},},
+  "no_log": FieldAttribute{T: "bool", Default: nil, Required: false, Priority: 0, Inherit: true, Alias: []string{}, Extend: false, Prepend: false,},
+  "always_run": FieldAttribute{T: "bool", Default: nil, Required: false, Priority: 0, Inherit: true, Alias: []string{}, Extend: false, Prepend: false,},
+  "run_once": FieldAttribute{T: "bool", Default: nil, Required: false, Priority: 0, Inherit: true, Alias: []string{}, Extend: false, Prepend: false,},
+  "ignore_errors": FieldAttribute{T: "bool", Default: nil, Required: false, Priority: 0, Inherit: true, Alias: []string{}, Extend: false, Prepend: false,},
+  "check_mode": FieldAttribute{T: "bool", Default: nil, Required: false, Priority: 0, Inherit: true, Alias: []string{}, Extend: false, Prepend: false,},
+  "diff": FieldAttribute{T: "bool", Default: nil, Required: false, Priority: 0, Inherit: true, Alias: []string{}, Extend: false, Prepend: false,},
+  "any_errors_fatal": FieldAttribute{T: "bool", Default: nil, Required: false, Priority: 0, Inherit: true, Alias: []string{}, Extend: false, Prepend: false,},
+  "debugger": FieldAttribute{T: "string", Default: "", Required: false, Priority: 0, Inherit: true, Alias: []string{}, Extend: false, Prepend: false,},
 }
 
 type Base struct {
@@ -165,11 +178,48 @@ type Base struct {
   finalized bool
 
   Attr_name interface{}
+  // connection/transport
+  Attr_connection interface{}
+  Attr_port interface{}
+  Attr_remote_user interface{}
+  // variables
+  Attr_vars interface{}
+  // flags and misc. settings
+  Attr_environment interface{}
+  Attr_no_log interface{}
+  Attr_always_run interface{}
+  Attr_run_once interface{}
+  Attr_ignore_errors interface{}
+  Attr_check_mode interface{}
+  Attr_diff interface{}
+  Attr_any_errors_fatal interface{}
+  // explicitly invoke a debugger on tasks
+  Attr_debugger interface{}
+  // methods we override from the top-level composed class
+  GetInheritedValue func (string) interface{}
+  GetAllObjectFieldAttributes func() map[string]FieldAttribute
 }
 
+// base mixin getters
 func (b *Base) Name() string {
   name, _ := b.Attr_name.(string)
   return name
+}
+func (b *Base) Connection() string {
+  if res, ok := b.GetInheritedValue("connection").(string); ok {
+    return res
+  } else {
+    res, _ := base_fields["connection"].Default.(string)
+    return res
+  }
+}
+func (b *Base) Port() int {
+  if res, ok := b.GetInheritedValue("port").(int); ok {
+    return res
+  } else {
+    res, _ := base_fields["port"].Default.(int)
+    return res
+  }
 }
 
 func (b *Base) Load(data map[interface{}]interface{}) {
