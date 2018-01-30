@@ -57,3 +57,10 @@ type ConnectionInterface interface {
 func LoadConnectionPlugin(name string) ConnectionInterface {
   return LoadPlugin(name, "connection").(ConnectionInterface)
 }
+
+type StrategyInterface interface {
+}
+
+func LoadStrategyPlugin(name string) StrategyInterface {
+  return LoadPlugin(name, "strategy").(StrategyInterface)
+}
