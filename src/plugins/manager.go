@@ -4,7 +4,7 @@ import (
   "os"
   "plugin"
   "strings"
-  "ansible/playbook"
+  "github.com/ansible/ansigo/src/playbook"
 )
 
 func PluginExists(name string, class string) bool {

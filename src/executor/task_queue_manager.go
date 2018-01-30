@@ -2,8 +2,8 @@ package executor
 
 import (
   "fmt"
-  "ansible/inventory"
-  "ansible/playbook"
+  "github.com/ansible/ansigo/src/inventory"
+  "github.com/ansible/ansigo/src/playbook"
 )
 
 const TQM_RUN_OK = 0

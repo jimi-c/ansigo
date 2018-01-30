@@ -12,8 +12,8 @@ import (
   "path/filepath"
   "regexp"
   "strings"
-  "ansible/playbook"
-  "ansible/plugins"
+  "github.com/ansible/ansigo/src/playbook"
+  "github.com/ansible/ansigo/src/plugins"
 )
 
 const ANSIBALLZ_TEMPLATE = `%{shebang}s

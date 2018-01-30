@@ -3,7 +3,7 @@ package main
 import (
   "fmt"
   "os"
-  "ansible/executor"
+  "github.com/ansible/ansigo/src/executor"
 )
 
 func main() {

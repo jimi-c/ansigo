@@ -1,8 +1,8 @@
 package executor
 
 import (
-  "ansible/inventory"
-  "ansible/playbook"
+  "github.com/ansible/ansigo/src/inventory"
+  "github.com/ansible/ansigo/src/playbook"
 )
 
 // the primary running states for the play iteration

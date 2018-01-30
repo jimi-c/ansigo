@@ -2,8 +2,8 @@ package main
 
 import(
   //"ansible/executor"
-  "ansible/playbook"
-  action_base "ansible/plugins/action"
+  "github.com/ansible/ansigo/src/playbook"
+  action_base "github.com/ansible/ansigo/src/plugins/action"
 )
 
 type ActionPlugin struct {

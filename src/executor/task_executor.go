@@ -1,9 +1,9 @@
 package executor
 
 import (
-  "ansible/inventory"
-  "ansible/playbook"
-  "ansible/plugins"
+  "github.com/ansible/ansigo/src/inventory"
+  "github.com/ansible/ansigo/src/playbook"
+  "github.com/ansible/ansigo/src/plugins"
 )
 
 type TaskResult struct {

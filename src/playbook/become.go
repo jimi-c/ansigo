@@ -1,7 +1,7 @@
 package playbook
 
 import (
-  //"ansible/playbook"
+  //"github.com/ansible/ansigo/src/playbook"
 )
 
 var become_fields = map[string]FieldAttribute{
