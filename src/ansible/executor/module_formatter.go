@@ -468,6 +468,6 @@ func CompileModule(name string, args map[string]interface{}) string {
     "second": "0",
   }
   formatted_string := Tprintf(ANSIBALLZ_TEMPLATE, formatting_params)
-  ioutil.WriteFile("/tmp/module_" + name + ".py", []byte(formatted_string), 0644)
+  //ioutil.WriteFile("/tmp/module_" + name + ".py", []byte(formatted_string), 0644)
   return formatted_string
 }

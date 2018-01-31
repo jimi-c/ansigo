@@ -20,6 +20,7 @@ type WorkerSlot struct {
 type WorkerJob struct {
   Host inventory.Host
   Task playbook.Task
+  PlayContext playbook.PlayContext
 }
 
 type CallbackArgs struct {
@@ -83,7 +84,7 @@ func (tqm *TaskQueueManager) Run(play *playbook.Play) int {
     if t.Action() == "meta" {
       fmt.Println("META TASK:", t)
     } else {
-      tqm.QueueTask(host, *t)
+      tqm.QueueTask(host, *t, *play_context)
       pending_tasks += 1
       for pending_tasks > 0 {
         res := <-tqm.result_queue
@@ -96,8 +97,8 @@ func (tqm *TaskQueueManager) Run(play *playbook.Play) int {
   return TQM_RUN_OK
 }
 
-func (tqm *TaskQueueManager) QueueTask(host inventory.Host, task playbook.Task) {
-  job := WorkerJob{host, task}
+func (tqm *TaskQueueManager) QueueTask(host inventory.Host, task playbook.Task, play_context playbook.PlayContext) {
+  job := WorkerJob{host, task, play_context}
   tqm.work_queue <- job
   fmt.Println("- queued task")
 }
@@ -118,7 +119,7 @@ func NewTaskQueueManager(inventory *inventory.InventoryManager, run_additional_c
     // fan-out to the workers
     go func() {
       for n := range tqm.work_queue {
-        te := NewTaskExecutor(n.Host, n.Task)
+        te := NewTaskExecutor(n.Host, n.Task, n.PlayContext)
         res_chan <- te.Run()
       }
     }()

@@ -4,6 +4,7 @@ import (
   "os"
   "plugin"
   "strings"
+  "ansible/inventory"
   "ansible/playbook"
 )
 
@@ -47,6 +48,7 @@ func LoadActionPlugin(name string) ActionInterface {
 }
 
 type ConnectionInterface interface {
+  Initialize(inventory.Host, playbook.Task, playbook.PlayContext)
   Connect()
   Close()
   Execute([]string, string) (int, string, string)

@@ -15,6 +15,7 @@ type TaskResult struct {
 type TaskExecutor struct {
   Host inventory.Host
   Task playbook.Task
+  PlayContext playbook.PlayContext
 }
 
 func (te *TaskExecutor) Run() TaskResult {
@@ -142,7 +143,14 @@ func (te *TaskExecutor) Execute(vars map[string]interface{}) map[string]interfac
 }
 
 func (te *TaskExecutor) GetConnection() plugins.ConnectionInterface {
-  return plugins.LoadConnectionPlugin("local")
+  conn_name := te.PlayContext.Connection()
+  if conn_name == "smart" {
+    // FIXME: control persist detection
+    conn_name = "ssh"
+  }
+  conn := plugins.LoadConnectionPlugin(conn_name)
+  conn.Initialize(te.Host, te.Task, te.PlayContext)
+  return conn
 }
 
 func (te *TaskExecutor) GetActionHandler(connection plugins.ConnectionInterface) plugins.ActionInterface {
@@ -156,9 +164,10 @@ func (te *TaskExecutor) GetActionHandler(connection plugins.ConnectionInterface)
   return handler
 }
 
-func NewTaskExecutor(host inventory.Host, task playbook.Task) *TaskExecutor {
+func NewTaskExecutor(host inventory.Host, task playbook.Task, pc playbook.PlayContext) *TaskExecutor {
   te := new(TaskExecutor)
   te.Host = host
   te.Task = task
+  te.PlayContext = pc
   return te
 }

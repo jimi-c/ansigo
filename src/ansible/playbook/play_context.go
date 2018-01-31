@@ -1,6 +1,8 @@
 package playbook
 
-import ()
+import (
+  "reflect"
+)
 
 var TASK_ATTRIBUTE_OVERRIDES = []string{
   "become",
@@ -48,6 +50,8 @@ var OPTION_FLAGS = []string{
 }
 
 var play_context_fields = map[string]FieldAttribute{
+  "ssh_executable": FieldAttribute{T: "string", Default: "/usr/bin/ssh"},
+  "verbosity": FieldAttribute{T:"int", Default: 0},
   "skip_tags": FieldAttribute{T:"list", Default: nil, ListOf: "strings"},
   "only_tags": FieldAttribute{T:"list", Default: nil, ListOf: "strings"},
 }
@@ -119,6 +123,20 @@ func (pc *PlayContext) GetAllObjectFieldAttributes() map[string]FieldAttribute {
   return all_fields
 }
 
+func (pc *PlayContext) GetInheritedValue(attr string) interface{} {
+  field_name := "Attr_" + attr
+  s := reflect.ValueOf(pc).Elem()
+  field := s.FieldByName(field_name)
+
+  var cur_value interface{}
+  if field.Kind() != reflect.Invalid {
+    cur_value = field.Interface()
+  } else {
+    cur_value = nil
+  }
+  return cur_value
+}
+
 func (pc *PlayContext) Load(play *Play, options interface{}) {
   dummy := make(map[interface{}]interface{})
 
@@ -140,6 +158,7 @@ func (pc *PlayContext) SetOptions(options interface{}) {
 }
 
 func (pc *PlayContext) SetPlay(play *Play) {
+  pc.Attr_connection = play.Connection()
 }
 
 // local getters
@@ -156,6 +175,14 @@ func (pc *PlayContext) Only_tags() []string {
     return res
   } else {
     res, _ := play_context_fields["only_tags"].Default.([]string)
+    return res
+  }
+}
+func (pc *PlayContext) SSH_executable() string {
+  if res, ok := pc.Attr_ssh_executable.(string); ok {
+    return res
+  } else {
+    res, _ := play_context_fields["ssh_executable"].Default.(string)
     return res
   }
 }

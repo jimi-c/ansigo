@@ -1,4 +1,4 @@
-package action
+package strategy
 
 import(
   //"ansible/plugins"

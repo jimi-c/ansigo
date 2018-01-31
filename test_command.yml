@@ -1,7 +1,6 @@
 - hosts: all
+  connection: ssh
   gather_facts: no
   tasks:
-  - command: "echo 'hello'"
-  - command:
-      _raw_params: "echo hello"
+  - command: hostname
 

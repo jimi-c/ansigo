@@ -5,9 +5,11 @@ import(
   "os"
   "os/exec"
   "strings"
+  connection_base "ansible/plugins/connection"
 )
+
 type ConnectionPlugin struct {
-  Connected bool
+  connection_base.ConnectionPluginBase
 }
 
 func (c *ConnectionPlugin) Connect() {
