@@ -1,0 +1,102 @@
+CREATING ELSE TOKEN FROM  else 
+CREATING ELSE TOKEN FROM  else 
+[{{1 1}  for entry in entries } {{31 1} 
+    } {{32 2}  if loop.changed(entry.category) } {{81 2} 
+        <h2>} {{81 2}  entry.category } {{111 3} </h2>
+    } {{112 4}} {{130 4} 
+    <p>} {{130 4}  entry.message } {{154 5} </p>
+} {{155 6}} {{186 7} 
+  This is a for else
+} {{187 8}} {{199 8} 
+} {{200 9}  if kenny.sick } {{238 10} 
+    Kenny is sick.
+} {{239 11}  elif kenny.dead } {{298 12} 
+    You killed Kenny!  You bastard!!!
+} {{299 13}} {{341 14} 
+    Kenny looks okay --- so far
+} {{342 15}} {{363 15} 
+This is a } {{363 15} variable} {{390 15}  and this is a } {{391 16}  if block } {{417 15} inside the if} {{418 16}} {{427 16} 
+}]
+PARSING BLOCKS 0
+PARSING FOR STATEMENT 0
+PARSING BLOCKS 1
+PARSING TEXT 1
+DONE PARSING TEXT
+PARSING IF 2 Number of Tokens: 28
+PARSING BLOCKS 3
+PARSING TEXT 3
+DONE PARSING TEXT
+PARSING VARIABLE 4
+DONE PARSING VARIABLE
+PARSING TEXT 5
+DONE PARSING TEXT
+DONE PARSING BLOCKS 6
+DONE PARSING IF STATEMENT
+PARSING TEXT 7
+DONE PARSING TEXT
+PARSING VARIABLE 8
+DONE PARSING VARIABLE
+PARSING TEXT 9
+DONE PARSING TEXT
+DONE PARSING BLOCKS 10
+PARSING ELSE STATEMENT 10
+PARSING BLOCKS 11
+PARSING TEXT 11
+DONE PARSING TEXT
+DONE PARSING BLOCKS 12
+DONE PARSING ELSE STATEMENT
+PARSING BLOCKS 13
+PARSING TEXT 13
+DONE PARSING TEXT
+PARSING IF 14 Number of Tokens: 28
+PARSING BLOCKS 15
+PARSING TEXT 15
+DONE PARSING TEXT
+DONE PARSING BLOCKS 16
+PARSING ELIF STATEMENT 16
+PARSING BLOCKS 17
+PARSING TEXT 17
+DONE PARSING TEXT
+DONE PARSING BLOCKS 18
+DONE PARSING ELIF STATEMENT
+PARSING ELSE STATEMENT 18
+PARSING BLOCKS 19
+PARSING TEXT 19
+DONE PARSING TEXT
+DONE PARSING BLOCKS 20
+DONE PARSING ELSE STATEMENT
+DONE PARSING IF STATEMENT
+PARSING TEXT 21
+DONE PARSING TEXT
+PARSING VARIABLE 22
+DONE PARSING VARIABLE
+PARSING TEXT 23
+DONE PARSING TEXT
+PARSING IF 24 Number of Tokens: 28
+PARSING BLOCKS 25
+PARSING TEXT 25
+DONE PARSING TEXT
+DONE PARSING BLOCKS 26
+DONE PARSING IF STATEMENT
+PARSING TEXT 27
+DONE PARSING TEXT
+DONE PARSING BLOCKS 28
+DONE PARSING FOR STATEMENT
+DONE PARSING BLOCKS 28
+CONTAINED TOKENS: [{{1 1}  for entry in entries } {{31 1} 
+    } {{32 2}  if loop.changed(entry.category) } {{81 2} 
+        <h2>} {{81 2}  entry.category } {{111 3} </h2>
+    } {{112 4}} {{130 4} 
+    <p>} {{130 4}  entry.message } {{154 5} </p>
+} {{155 6}} {{186 7} 
+  This is a for else
+} {{187 8}} {{199 8} 
+} {{200 9}  if kenny.sick } {{238 10} 
+    Kenny is sick.
+} {{239 11}  elif kenny.dead } {{298 12} 
+    You killed Kenny!  You bastard!!!
+} {{299 13}} {{341 14} 
+    Kenny looks okay --- so far
+} {{342 15}} {{363 15} 
+This is a } {{363 15} variable} {{390 15}  and this is a } {{391 16}  if block } {{417 15} inside the if} {{418 16}} {{427 16} 
+}]
