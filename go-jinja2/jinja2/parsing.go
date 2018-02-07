@@ -1,6 +1,16 @@
 package jinja2
 
+/*
+TODO:
+* Remove FIXMEs
+* Implement other jinja2 constructs (currently only support if/for/raw and variables)
+  - includes and blocks next
+* Implement left/right stripping of newlines when "{%- -%}" / are used
+* Clean up this file and reorganize chunk structs vs. token structs
+*/
+
 import (
+  //"fmt"
   "errors"
   "strconv"
   "unicode"
@@ -10,12 +20,14 @@ import (
 
 var (
 	PythonLexer = lexer.Unquote(lexer.Must(lexer.Regexp(`(\s+)`+
+		`|(?P<Bool>[Tt]rue|[Ff]alse)`+
 		`|(?P<Ident>[a-zA-Z_][a-zA-Z0-9_]*)`+
-    `|(?P<Keyword>or|and|is|in|not)`+
-    `|(?P<Operators>\||<>|!=|<=|>=|//|[-+*/%,.()=<>])`+
 		`|(?P<String>'[^']*'|"[^"]*")`+
+    `|(?P<Operators>\||<>|==|!=|<=|>=|[-+*/%,.()=<>])`+
+		`|(?P<None>None)`+
+		`|(?P<Float>[-+]?\d*\.\d+([eE][-+]?\d+)?)`+
 		`|(?P<Int>[-+]?\d*)`+
-		`|(?P<Float>[-+]?\d*\.\d+([eE][-+]?\d+)?)`,
+    `|(?P<Keyword>or|and|is|in|not|if|elif|else)`,
 	)), "String")
 )
 
@@ -94,7 +106,7 @@ func (self *VariableChunk) Render(c *Context) (string, error) {
     if v, ok := res.Data.(float64); !ok {
       return "", errors.New("error converting boolean variable result to a string")
     } else {
-      return strconv.FormatFloat(v, 'E', -1, 64), nil
+      return strconv.FormatFloat(v, 'f', -1, 64), nil
     }
   }
   return "", errors.New("unknown type returned from variable statement ("+strconv.Itoa(int(res.Type))+"), cannot convert it to a string")
@@ -193,6 +205,7 @@ type ForToken struct {
 
 type ForChunk struct {
   ForAst *ForStatement
+  IfAst *IfStatement
   Chunks []Renderable
   ElseChunks []Renderable
 }
@@ -205,7 +218,7 @@ func (self *ForChunk) Render(c *Context) (string, error) {
   num_tests := int64(len(self.ForAst.TestList.Tests))
   // FIXME: last_val would be used with the `loop.changed()` call,
   //        but that is not yet implemented (needs callables)
-  //last_val := VariableType{PY_TYPE_UNKNOWN, nil}
+  //last_val := VariableType{PY_TYPE_UNDEFINED, nil}
   for idx, test := range self.ForAst.TestList.Tests {
     test_res, err := test.Eval(c)
     if err != nil {
@@ -215,15 +228,16 @@ func (self *ForChunk) Render(c *Context) (string, error) {
     loop_vars := make(map[string]VariableType)
     loop_vars["index"] = VariableType{PY_TYPE_INT, int64(idx + 1)}
     loop_vars["index0"] = VariableType{PY_TYPE_INT, int64(idx)}
-    loop_vars["revindex"] = VariableType{PY_TYPE_INT, num_tests - int64(idx + 1)}
-    loop_vars["revindex0"] = VariableType{PY_TYPE_INT, num_tests - int64(idx)}
+    loop_vars["revindex"] = VariableType{PY_TYPE_INT, num_tests - int64(idx + 1)} // FIXME: not sure if this is right
+    loop_vars["revindex0"] = VariableType{PY_TYPE_INT, num_tests - int64(idx)}  // FIXME: not sure if this is right
     loop_vars["first"] = VariableType{PY_TYPE_BOOL, idx == 0}
     loop_vars["last"] = VariableType{PY_TYPE_BOOL, int64(idx) == num_tests}
     loop_vars["length"] = VariableType{PY_TYPE_BOOL, num_tests}
     loop_vars["depth"] = VariableType{PY_TYPE_BOOL, int64(1)} // FIXME: recursive property
     loop_vars["depth0"] = VariableType{PY_TYPE_BOOL, int64(0)} // FIXME: recursive property
-    // FIXME: implement loop.cycle
-    // FIXME: implement loop.changed
+    // FIXME: implement loop.cycle (callable)
+    // FIXME: implement loop.changed (callable)
+    // FIXME: implement loop() (callable)
     if idx > 0 {
       previtem, err := self.ForAst.TestList.Tests[idx - 1].Eval(c)
       if err != nil {
@@ -231,7 +245,7 @@ func (self *ForChunk) Render(c *Context) (string, error) {
       }
       loop_vars["previtem"] = previtem
     } else {
-      loop_vars["previtem"] = VariableType{PY_TYPE_UNKNOWN, nil}
+      loop_vars["previtem"] = VariableType{PY_TYPE_UNDEFINED, nil}
     }
     if int64(idx) < num_tests - 1 {
       nextitem, err := self.ForAst.TestList.Tests[idx + 1].Eval(c)
@@ -240,7 +254,7 @@ func (self *ForChunk) Render(c *Context) (string, error) {
       }
       loop_vars["nextitem"] = nextitem
     } else {
-      loop_vars["nextitem"] = VariableType{PY_TYPE_UNKNOWN, nil}
+      loop_vars["nextitem"] = VariableType{PY_TYPE_UNDEFINED, nil}
     }
     c.Variables["loop"] = VariableType{PY_TYPE_DICT, loop_vars}
     // map the test result to the expression list
@@ -250,15 +264,32 @@ func (self *ForChunk) Render(c *Context) (string, error) {
       target := self.ForAst.TargetList.Targets[0]
       c.Variables[*target.Name] = test_res
     }
-    // render the main chunks
-    for _, chunk := range self.Chunks {
-      c_res, err := chunk.Render(c)
+    do_loop := true
+    if self.ForAst.IfStatement != nil {
+      if_res, err := self.ForAst.IfStatement.Eval(c)
       if err != nil {
-        return "", err
-      } else {
-        res = res + c_res
+        return "ERROR EVALUATING IF STATEMENT ON LOOP", err
+      }
+      if_bool, err := if_res.AsBool()
+      if err != nil {
+        return "ERROR CONVERTING IF RESULT ON LOOP TO BOOLEAN RESULT", err
+      }
+      do_loop = if_bool
+    }
+    if !do_loop {
+      continue
+    } else {
+      // render the main chunks
+      for _, chunk := range self.Chunks {
+        c_res, err := chunk.Render(c)
+        if err != nil {
+          return "", err
+        } else {
+          res = res + c_res
+        }
       }
     }
+    delete(c.Variables, "loop")
     // mark the loop flag as true so we don't execute the else statement
     did_loop = true
   }

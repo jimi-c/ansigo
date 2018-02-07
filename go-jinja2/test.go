@@ -4,7 +4,6 @@ import (
   "os"
   "strconv"
   "./jinja2"
-  //"github.com/alecthomas/participle"
   "encoding/json"
 )
 
@@ -14,7 +13,22 @@ func PrettyPrint(v interface{}) {
 }
 
 func main() {
-  input := `{% for foo in 10,20,30 %}{{loop.index}}=>{{foo}}({% if loop.nextitem is defined %}{{loop.nextitem}}{% else %}no next item{% endif %}) {% endfor %}`
+  /*
+  input := `{% for foo in 10,20,30 if foo != 10 %}{# comment #}
+{{loop.index}}=>{{foo}}({% if loop.nextitem is defined %}{{loop.nextitem}}{% else %}no next item{% endif %})
+{% endfor %}`
+*/
+  input := `
+{{1+2}}
+{{2-1}}
+{{"2"+bam}}
+{{42.0/42.33}}
+{{ "foo" }}
+{{bam|int * 2}}
+{{foo / 2}}
+{% if True %}Hello world{% else %}Goodbye world{%endif%}
+{% if False %}Hello world{% else %}Goodbye world{%endif%}
+{%for i in 1, 2, 3 %}{{i}}{%endfor%}`
   c := jinja2.NewContext(nil)
 
   c.Variables["foo"] = jinja2.VariableType{jinja2.PY_TYPE_BOOL, false}
