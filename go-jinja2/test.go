@@ -4,37 +4,28 @@ import (
   "os"
   "strconv"
   "./jinja2"
+  //"github.com/alecthomas/participle"
+  "encoding/json"
 )
-func main() {
-  input := `{% if foo %}
-    Foo was true.
-{% elif bar %}
-    Bar was true.
-{% else %}
-    Neither foo nor bar were true.
-{% endif %}
-`
-  c := new(jinja2.Context)
-  c.Variables = make(map[string]jinja2.VariableType)
-  c.Filters = make(map[string]func(...interface{})interface{})
-  c.Tests = make(map[string]func(...interface{})interface{})
 
-  c.Variables["foo"] = jinja2.VariableType{jinja2.PY_TYPE_BOOL, true}
+func PrettyPrint(v interface{}) {
+  b, _ := json.MarshalIndent(v, "", "  ")
+  println(string(b))
+}
+
+func main() {
+  input := `{% for foo in 10,20,30 %}{{loop.index}}=>{{foo}}({% if loop.nextitem is defined %}{{loop.nextitem}}{% else %}no next item{% endif %}) {% endfor %}`
+  c := jinja2.NewContext(nil)
+
+  c.Variables["foo"] = jinja2.VariableType{jinja2.PY_TYPE_BOOL, false}
   c.Variables["bar"] = jinja2.VariableType{jinja2.PY_TYPE_BOOL, false}
+  c.Variables["bam"] = jinja2.VariableType{jinja2.PY_TYPE_STRING, "2"}
 
   for i := 0; i < 1; i++ {
-    fmt.Println("PARSING TEMPLATE:")
-    fmt.Println(input)
-    fmt.Println("------------------------------------------------------------")
-    fmt.Println("VARIABLES:")
-    fmt.Println(c.Variables)
-    fmt.Println("------------------------------------------------------------")
     tokens := jinja2.Tokenize(input)
-    //fmt.Println(tokens)
     for pos := 0; pos < len(tokens); {
       new_pos, contained_chunks, err := jinja2.ParseBlocks(tokens, pos, "")
       if err != nil {
-        //fmt.Println("ERROR:", err, "at " + strconv.Itoa(tokens[new_pos].GetPos()))
         fmt.Println("ERROR:", err, "at " + strconv.Itoa(new_pos))
         os.Exit(1)
       }
@@ -48,10 +39,12 @@ func main() {
           res = res + c_res
         }
       }
+      _ = res
       fmt.Println("RENDER COMPLETE:")
       fmt.Println(res)
       pos = new_pos
     }
   }
+
   os.Exit(0)
 }

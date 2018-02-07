@@ -1,10 +1,22 @@
 package jinja2
 
 import (
-  "fmt"
   "errors"
+  "strconv"
   "unicode"
   "github.com/alecthomas/participle"
+  "github.com/alecthomas/participle/lexer"
+)
+
+var (
+	PythonLexer = lexer.Unquote(lexer.Must(lexer.Regexp(`(\s+)`+
+		`|(?P<Ident>[a-zA-Z_][a-zA-Z0-9_]*)`+
+    `|(?P<Keyword>or|and|is|in|not)`+
+    `|(?P<Operators>\||<>|!=|<=|>=|//|[-+*/%,.()=<>])`+
+		`|(?P<String>'[^']*'|"[^"]*")`+
+		`|(?P<Int>[-+]?\d*)`+
+		`|(?P<Float>[-+]?\d*\.\d+([eE][-+]?\d+)?)`,
+	)), "String")
 )
 
 type TokenBoundary struct {
@@ -52,12 +64,40 @@ type VariableToken struct {
 }
 
 type VariableChunk struct {
-  VarAst interface{}
-  Content string
+  VarAst *VariableStatement
 }
 func (self *VariableChunk) Render(c *Context) (string, error) {
-  //return self.VarAst.Eval(c), nil
-  return "VARIABLE HERE", nil
+  res, err := self.VarAst.Eval(c)
+  if err != nil {
+    return "ERROR EVALUATING VARIABLE STATEMENT", err
+  }
+  switch res.Type {
+  case PY_TYPE_STRING:
+    if v, ok := res.Data.(string); !ok {
+      return "", errors.New("error converting string variable result to a string")
+    } else {
+      return v, nil
+    }
+  case PY_TYPE_INT:
+    if v, ok := res.Data.(int64); !ok {
+      return "", errors.New("error converting integer variable result to a string")
+    } else {
+      return strconv.FormatInt(v, 10), nil
+    }
+  case PY_TYPE_BOOL:
+    if v, ok := res.Data.(bool); !ok {
+      return "", errors.New("error converting boolean variable result to a string")
+    } else {
+      return strconv.FormatBool(v), nil
+    }
+  case PY_TYPE_FLOAT:
+    if v, ok := res.Data.(float64); !ok {
+      return "", errors.New("error converting boolean variable result to a string")
+    } else {
+      return strconv.FormatFloat(v, 'E', -1, 64), nil
+    }
+  }
+  return "", errors.New("unknown type returned from variable statement ("+strconv.Itoa(int(res.Type))+"), cannot convert it to a string")
 }
 
 type IfToken struct {
@@ -152,8 +192,89 @@ type ForToken struct {
 }
 
 type ForChunk struct {
+  ForAst *ForStatement
+  Chunks []Renderable
+  ElseChunks []Renderable
 }
-func (self *ForChunk) Render(c *Context) (string, error) { return "", nil }
+func (self *ForChunk) Render(c *Context) (string, error) {
+  if len(self.ForAst.TargetList.Targets) == 0 {
+    return "ERROR EVALUATING FOR LOOP", errors.New("no targets found for assignment in the for loop")
+  }
+  res := ""
+  did_loop := false
+  num_tests := int64(len(self.ForAst.TestList.Tests))
+  // FIXME: last_val would be used with the `loop.changed()` call,
+  //        but that is not yet implemented (needs callables)
+  //last_val := VariableType{PY_TYPE_UNKNOWN, nil}
+  for idx, test := range self.ForAst.TestList.Tests {
+    test_res, err := test.Eval(c)
+    if err != nil {
+      return "ERROR EVALUATING FOR LOOP", err
+    }
+    // set loop variables
+    loop_vars := make(map[string]VariableType)
+    loop_vars["index"] = VariableType{PY_TYPE_INT, int64(idx + 1)}
+    loop_vars["index0"] = VariableType{PY_TYPE_INT, int64(idx)}
+    loop_vars["revindex"] = VariableType{PY_TYPE_INT, num_tests - int64(idx + 1)}
+    loop_vars["revindex0"] = VariableType{PY_TYPE_INT, num_tests - int64(idx)}
+    loop_vars["first"] = VariableType{PY_TYPE_BOOL, idx == 0}
+    loop_vars["last"] = VariableType{PY_TYPE_BOOL, int64(idx) == num_tests}
+    loop_vars["length"] = VariableType{PY_TYPE_BOOL, num_tests}
+    loop_vars["depth"] = VariableType{PY_TYPE_BOOL, int64(1)} // FIXME: recursive property
+    loop_vars["depth0"] = VariableType{PY_TYPE_BOOL, int64(0)} // FIXME: recursive property
+    // FIXME: implement loop.cycle
+    // FIXME: implement loop.changed
+    if idx > 0 {
+      previtem, err := self.ForAst.TestList.Tests[idx - 1].Eval(c)
+      if err != nil {
+        return "ERROR EVALUATING LOOP (next item)", err
+      }
+      loop_vars["previtem"] = previtem
+    } else {
+      loop_vars["previtem"] = VariableType{PY_TYPE_UNKNOWN, nil}
+    }
+    if int64(idx) < num_tests - 1 {
+      nextitem, err := self.ForAst.TestList.Tests[idx + 1].Eval(c)
+      if err != nil {
+        return "ERROR EVALUATING LOOP (next item)", err
+      }
+      loop_vars["nextitem"] = nextitem
+    } else {
+      loop_vars["nextitem"] = VariableType{PY_TYPE_UNKNOWN, nil}
+    }
+    c.Variables["loop"] = VariableType{PY_TYPE_DICT, loop_vars}
+    // map the test result to the expression list
+    if len(self.ForAst.TargetList.Targets) != 1 {
+      // FIXME: implement this
+    } else {
+      target := self.ForAst.TargetList.Targets[0]
+      c.Variables[*target.Name] = test_res
+    }
+    // render the main chunks
+    for _, chunk := range self.Chunks {
+      c_res, err := chunk.Render(c)
+      if err != nil {
+        return "", err
+      } else {
+        res = res + c_res
+      }
+    }
+    // mark the loop flag as true so we don't execute the else statement
+    did_loop = true
+  }
+  if !did_loop {
+    // render the else chunks
+    for _, chunk := range self.ElseChunks {
+      c_res, err := chunk.Render(c)
+      if err != nil {
+        return "", err
+      } else {
+        res = res + c_res
+      }
+    }
+  }
+  return res, nil
+}
 
 type EndforToken struct {
   TokenBase
@@ -497,6 +618,19 @@ func ParseText(tokens []Token, pos int) (int, Renderable, error) {
     return cur_pos+1, text_chunk, nil
   }
 }
+func ParseVariableStatement(statement string) (*VariableStatement, error) {
+  //fmt.Println("PARSING VARIABLE STATEMENT:", statement)
+  parser, err := participle.Build(&VariableStatement{}, PythonLexer)
+  if err != nil {
+    return nil, err
+  }
+  ast := &VariableStatement{}
+  if err := parser.ParseString(statement, ast); err != nil {
+    return nil, err
+  }
+  //fmt.Println("DONE PARSING VARIABLE STATEMENT")
+  return ast, nil
+}
 func ParseVariable(tokens []Token, pos int) (int, Renderable, error) {
   //fmt.Println("PARSING VARIABLE", pos)
   cur_pos := pos
@@ -506,13 +640,18 @@ func ParseVariable(tokens []Token, pos int) (int, Renderable, error) {
     //fmt.Println("DONE PARSING VARIABLE")
     var_token := tokens[cur_pos].(VariableToken)
     var_chunk := new(VariableChunk)
-    var_chunk.Content = var_token.Content
+    ast, err := ParseVariableStatement(var_token.Content)
+    if err != nil {
+      return pos, &DummyChunk{}, err
+    }
+    var_chunk.VarAst = ast
     return cur_pos+1, var_chunk, nil
   }
 }
 
 func ParseIfStatement(statement string) (*IfStatement, error) {
-  parser, err := participle.Build(&IfStatement{}, nil)
+  //fmt.Println("PARSING IF:", statement)
+  parser, err := participle.Build(&IfStatement{}, PythonLexer)
   if err != nil {
     return nil, err
   }
@@ -583,7 +722,7 @@ func ParseIf(tokens []Token, pos int) (int, Renderable, error) {
 }
 
 func ParseElifStatement(statement string) (*ElifStatement, error) {
-  parser, err := participle.Build(&ElifStatement{}, nil)
+  parser, err := participle.Build(&ElifStatement{}, PythonLexer)
   if err != nil {
     return nil, err
   }
@@ -670,8 +809,8 @@ func ParseElse(tokens []Token, pos int, in string) (int, []Renderable, error) {
   return cur_pos, chunks, nil
 }
 func ParseForStatement(statement string) (*ForStatement, error) {
-  fmt.Println("PARSING FOR STATEMENT:", statement)
-  parser, err := participle.Build(&ForStatement{}, nil)
+  //fmt.Println("PARSING FOR STATEMENT:", statement)
+  parser, err := participle.Build(&ForStatement{}, PythonLexer)
   if err != nil {
     return nil, err
   }
@@ -679,36 +818,33 @@ func ParseForStatement(statement string) (*ForStatement, error) {
   if err := parser.ParseString(statement, ast); err != nil {
     return nil, err
   }
-  fmt.Println("DONE PARSING FOR STATEMENT")
+  //fmt.Println("DONE PARSING FOR STATEMENT")
   return ast, nil
 }
 func ParseFor(tokens []Token, pos int) (int, Renderable, error) {
   //fmt.Println("PARSING FOR STATEMENT", pos)
-  // For:
-  // ForToken -> (TextToken|VariableToken|IfToken...|ForToken...) -> EndforToken
-  cur_pos := pos
-  var for_token ForToken
-  //var contained_tokens []Token
-  var endfor_token EndforToken
+  for_chunk := new(ForChunk)
+  for_chunk.ForAst = nil
+  for_chunk.Chunks = make([]Renderable, 0)
+  for_chunk.ElseChunks = make([]Renderable, 0)
 
+  cur_pos := pos
   if res := PeekToken(tokens[cur_pos]); res != "for" {
     return cur_pos, &DummyChunk{}, errors.New("expected a 'for' token but got '" + res + "' instead.")
   }
-  for_token = tokens[cur_pos].(ForToken)
-  cur_pos += 1
-
+  for_token := tokens[cur_pos].(ForToken)
   ast, err := ParseForStatement(for_token.ForStatement)
   if err != nil {
     return pos, &DummyChunk{}, err
   }
-  _ = ast
+  for_chunk.ForAst = ast
+  cur_pos += 1
 
   found_endfor := false
   for cur_pos < len(tokens) {
     res := PeekToken(tokens[cur_pos])
     switch res {
     case "endfor":
-      endfor_token = tokens[cur_pos].(EndforToken)
       found_endfor = true
       cur_pos += 1
       break
@@ -717,22 +853,19 @@ func ParseFor(tokens []Token, pos int) (int, Renderable, error) {
       if err != nil {
         return cur_pos, &DummyChunk{}, err
       }
-      _ = else_chunks
+      for_chunk.ElseChunks = append(for_chunk.ElseChunks, else_chunks...)
       cur_pos = new_pos
     default:
       new_pos, contained_chunks, err := ParseBlocks(tokens, cur_pos, "for")
       if err != nil {
         return cur_pos, &DummyChunk{}, err
       }
-      _ = contained_chunks
+      for_chunk.Chunks = append(for_chunk.Chunks, contained_chunks...)
       cur_pos = new_pos
     }
   }
   if !found_endfor {
     return cur_pos, &DummyChunk{}, errors.New("Missing 'endfor' for for loop tags.")
   }
-  _ = for_token
-  _ = endfor_token
-  //fmt.Println("DONE PARSING FOR STATEMENT")
-  return cur_pos, &DummyChunk{}, nil
+  return cur_pos, for_chunk, nil
 }
