@@ -3,10 +3,13 @@ package jinja2
 /*
 TODO:
 * Remove FIXMEs
+* testing testing and more testing
+* Better error handling, with line/col info attached to error
 * Implement other jinja2 constructs (currently only support if/for/raw and variables)
   - includes and blocks next
 * Implement left/right stripping of newlines when "{%- -%}" / are used
 * Clean up this file and reorganize chunk structs vs. token structs
+* Add a proper Template class with a render method
 */
 
 import (

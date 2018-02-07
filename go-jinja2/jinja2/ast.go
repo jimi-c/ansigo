@@ -3,7 +3,8 @@ package jinja2
 /*
 TODO:
 * Remove FIXMEs
-* testing testing testing
+* testing testing and more testing
+* Better error handling, with line/col info attached to error
 * Implement lists/tuples and maps/sets (and any other builtin types missing from Atom)
 * Implement "is [not] in" and "is [not]" comparison checks
 * Implement callables
