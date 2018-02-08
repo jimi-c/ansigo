@@ -2,15 +2,31 @@ package main
 import (
   "fmt"
   "os"
-  "strconv"
   "./jinja2"
-  "encoding/json"
 )
 
-func PrettyPrint(v interface{}) {
-  b, _ := json.MarshalIndent(v, "", "  ")
-  println(string(b))
-}
+/*
+TODO:
+* Remove FIXMEs
+* testing testing and more testing
+* Better error handling, with line/col info attached to error
+* Implement lists/tuples and maps/sets (and any other builtin types missing from Atom)
+* Implement "is [not] in" and "is [not]" comparison checks
+* Implement callables
+* Once we have callables, implement basic python builtin type methods?
+* Cleanup:
+  - Hide details of conversion between go types and VariableType stuff by adding helpers
+    in Context to load a map of variables and convert them to VariableType. Also only have
+    jinja2 output be a string when parsing. Direct use of AST stuff will still return a
+    VariableType
+* Filters & Tests:
+  - Implement default jinja2 filters and tests
+  - Make sure that all filters & tests work with parameters being passed in
+  - Implement a way to load additional filters/tests via plugins
+* Implement other jinja2 constructs (currently only support if/for/raw and variables)
+  - includes and blocks next
+* Implement left/right stripping of newlines when "{%- -%}" / are used
+*/
 
 func main() {
   /*
@@ -29,6 +45,7 @@ func main() {
 {% if True %}Hello world{% else %}Goodbye world{%endif%}
 {% if False %}Hello world{% else %}Goodbye world{%endif%}
 {%for i in 1, 2, 3 %}{{i}}{%endfor%}
+{%for i in 1, 2, 3 if i > 1 %}{{i}}{%endfor%}
 `
   c := jinja2.NewContext(nil)
 
@@ -36,29 +53,14 @@ func main() {
   c.Variables["bar"] = jinja2.VariableType{jinja2.PY_TYPE_BOOL, false}
   c.Variables["bam"] = jinja2.VariableType{jinja2.PY_TYPE_STRING, "2"}
 
-  tokens := jinja2.Tokenize(input)
-  template_chunks := make([]jinja2.Renderable, 0)
-  for pos := 0; pos < len(tokens); {
-    new_pos, contained_chunks, err := jinja2.ParseBlocks(tokens, pos, "")
+  template := new(jinja2.Template)
+  template.Parse(input)
+  for i := 0; i < 1; i++ {
+    res, err := template.Render(c)
     if err != nil {
-      fmt.Println("ERROR:", err, "at " + strconv.Itoa(new_pos))
+      fmt.Println("Template rendering error:", err)
       os.Exit(1)
     }
-    template_chunks = append(template_chunks, contained_chunks...)
-    pos = new_pos
-  }
-  for i := 0; i < 1; i++ {
-    res := ""
-    for _, chunk := range template_chunks {
-      c_res, err := chunk.Render(c)
-      if err != nil {
-        fmt.Println("ERROR DURING RENDERING OF CHUNK:", err)
-        break
-      } else {
-        res = res + c_res
-      }
-    }
-    _ = res
     fmt.Println("RENDER COMPLETE:")
     fmt.Println(res)
   }
