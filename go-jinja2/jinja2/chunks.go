@@ -9,13 +9,14 @@ import (
 
 var (
 	PythonLexer = lexer.Unquote(lexer.Must(lexer.Regexp(`(\s+)`+
-		`|(?P<Bool>[Tt]rue|[Ff]alse)`+
-		`|(?P<Ident>[a-zA-Z_][a-zA-Z0-9_]*)`+
-		`|(?P<String>'[^']*'|"[^"]*")`+
+    `|(?P<Bool>[Tt]rue|[Ff]alse)`+
+    `|(?P<Ident>[a-zA-Z_][a-zA-Z0-9_]*)`+
+    `|(?P<String>'[^']*'|"[^"]*")`+
     `|(?P<Operators>\||<>|==|!=|<=|>=|[-+*/%,.()=<>])`+
-		`|(?P<None>None)`+
-		`|(?P<Float>[-+]?\d*\.\d+([eE][-+]?\d+)?)`+
-		`|(?P<Int>[-+]?\d*)`+
+    `|(?P<Delimiters>[()\[\]{}:])`+
+    `|(?P<None>None)`+
+    `|(?P<Float>[-+]?\d*\.\d+([eE][-+]?\d+)?)`+
+    `|(?P<Int>[-+]?\d*)`+
     `|(?P<Keyword>or|and|is|in|not|if|elif|else)`,
 	)), "String")
 )
@@ -37,14 +38,7 @@ func (self *TextChunk) Render(c *Context) (string, error) {
   return self.Text, nil
 }
 
-type VariableChunk struct {
-  VarAst *VariableStatement
-}
-func (self *VariableChunk) Render(c *Context) (string, error) {
-  res, err := self.VarAst.Eval(c)
-  if err != nil {
-    return "ERROR EVALUATING VARIABLE STATEMENT", err
-  }
+func VariableResToString(res VariableType) (string, error) {
   switch res.Type {
   case PY_TYPE_STRING:
     if v, ok := res.Data.(string); !ok {
@@ -66,12 +60,74 @@ func (self *VariableChunk) Render(c *Context) (string, error) {
     }
   case PY_TYPE_FLOAT:
     if v, ok := res.Data.(float64); !ok {
-      return "", errors.New("error converting boolean variable result to a string")
+      return "", errors.New("error converting float variable result to a string")
     } else {
       return strconv.FormatFloat(v, 'f', -1, 64), nil
     }
+  case PY_TYPE_LIST:
+    if v, ok := res.Data.([]VariableType); !ok {
+      return "", errors.New("error converting list variable result to a string")
+    } else {
+      res := "["
+      for idx, item := range v {
+        item_str, err := VariableResToString(item)
+        if err != nil {
+          return "", err
+        }
+        res += item_str
+        if idx < len(v) - 1 {
+          res += ", "
+        }
+      }
+      res += "]"
+      return res, nil
+    }
+  case PY_TYPE_DICT:
+    if v, ok := res.Data.(map[VariableType]VariableType); !ok {
+      return "", errors.New("error converting dict variable result to a string")
+    } else {
+      res := "{"
+      cur := 0
+      for key, val := range v {
+        key_str, key_err := VariableResToString(key)
+        if key_err != nil {
+          return "", key_err
+        }
+        val_str, val_err := VariableResToString(val)
+        if val_err != nil {
+          return "", val_err
+        }
+        if key.Type == PY_TYPE_STRING {
+          res += "'" + key_str + "'"
+        } else {
+          res += key_str
+        }
+        res = res + ": "
+        if val.Type == PY_TYPE_STRING {
+          res += "'" + val_str + "'"
+        } else {
+          res += val_str
+        }
+        if cur < len(v) - 1 {
+          res += ", "
+        }
+        cur += 1
+      }
+      res += "}"
+      return res, nil
+    }
   }
   return "", errors.New("unknown type returned from variable statement ("+strconv.Itoa(int(res.Type))+"), cannot convert it to a string")
+}
+type VariableChunk struct {
+  VarAst *VariableStatement
+}
+func (self *VariableChunk) Render(c *Context) (string, error) {
+  res, err := self.VarAst.Eval(c)
+  if err != nil {
+    return "ERROR EVALUATING VARIABLE STATEMENT", err
+  }
+  return VariableResToString(res)
 }
 
 type IfChunk struct {

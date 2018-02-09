@@ -37,24 +37,47 @@ func main() {
   input := `
 {{1+2}}
 {{2-1}}
+{{some_int}}
+{{some_float}}
 {{"2"+bam}}
 {{42.0/42.33}}
 {{ "foo" }}
 {{bam|int * 2}}
 {{foo / 2}}
-{% if True %}Hello world{% else %}Goodbye world{%endif%}
-{% if False %}Hello world{% else %}Goodbye world{%endif%}
+{{[1, 2, 3]}}
+{{{}}}
+{{{"a": 1}}}
+{{{"a": {"b": [1, 2, 3]}}}}
+{{{bam: foo}}}
+{{adict}}
+{{adict.keyfoo}}
+{{adict.keyfoo.keybar}}
+{% if true %}Hello world{% else %}Goodbye world{%endif%}
+{% if false %}Hello world{% else %}Goodbye world{%endif%}
 {%for i in 1, 2, 3 %}{{i}}{%endfor%}
-{%for i in 1, 2, 3 if i > 1 %}{{i}}{%endfor%}
+{%for i in 1, 2, 3 if i > some_int %}{{i}}{%endfor%}
 `
   c := jinja2.NewContext(nil)
-
-  c.Variables["foo"] = jinja2.VariableType{jinja2.PY_TYPE_BOOL, false}
-  c.Variables["bar"] = jinja2.VariableType{jinja2.PY_TYPE_BOOL, false}
-  c.Variables["bam"] = jinja2.VariableType{jinja2.PY_TYPE_STRING, "2"}
+  c.AddVariables(map[string]interface{} {
+      "foo": false,
+      "bar": true,
+      "bam": "2",
+      "some_int": 1,
+      "some_float": 3.14,
+      "adict": map[interface{}]interface{} {
+        "keyfoo": map[interface{}]interface{} {
+          "keybar": "hello",
+        },
+      },
+    },
+  )
 
   template := new(jinja2.Template)
-  template.Parse(input)
+  err := template.Parse(input)
+  if err != nil {
+    fmt.Println("ERROR PARSING TEMPLATE:", err)
+    os.Exit(1)
+  }
   for i := 0; i < 1; i++ {
     res, err := template.Render(c)
     if err != nil {

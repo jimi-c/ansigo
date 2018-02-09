@@ -2,6 +2,7 @@ package jinja2
 
 import (
   "errors"
+  "strings"
 )
 
 //-------------------------------------------------------------------------------------------------
@@ -554,10 +555,10 @@ func (self *AtomExpr) Eval(c *Context) (VariableType, error) {
         // this is a sub-key in a dictionary or an attribute on the
         // class, so we set the running value to whichever it is.
         if atom_res.Type == PY_TYPE_DICT {
-          if sub_dict, ok := atom_res.Data.(map[string]VariableType); !ok {
+          if sub_dict, ok := atom_res.Data.(map[VariableType]VariableType); !ok {
             // FIXME: error
           } else {
-            if v, ok := sub_dict[*t.Name]; !ok {
+            if v, ok := sub_dict[VariableType{PY_TYPE_STRING, *t.Name}]; !ok {
               // FIXME: error
             } else {
               atom_res = v
@@ -577,12 +578,14 @@ func (self *AtomExpr) Eval(c *Context) (VariableType, error) {
 }
 //-------------------------------------------------------------------------------------------------
 type Atom struct {
-  Name      *string   `  @Ident`
-	Str       *string   `| @String`
-	Float     *float64  `| @Float`
-	Int       *int64    `| @Int`
-	Bool      *string   `| @Bool`
-  None      *string   `| @None`
+  Name      *string      `  @Ident`
+  Str       *string      `| @String`
+  Float     *float64     `| @Float`
+  Int       *int64       `| @Int`
+  Bool      *string      `| @Bool`
+  None      *string      `| @None`
+  List      *ListDisplay `| @@`
+  Dict      *DictDisplay `| @@`
 }
 func (self *Atom) Eval(c *Context) (VariableType, error) {
   if self.Name != nil {
@@ -595,12 +598,14 @@ func (self *Atom) Eval(c *Context) (VariableType, error) {
   } else if self.Float != nil { return VariableType{PY_TYPE_FLOAT, *self.Float}, nil
   } else if self.Int != nil { return VariableType{PY_TYPE_INT, *self.Int}, nil
   } else if self.Bool != nil {
-    if *self.Bool == "True" {
+    if strings.ToLower(*self.Bool) == "true" {
       return VariableType{PY_TYPE_BOOL, true}, nil
     } else {
       return VariableType{PY_TYPE_BOOL, false}, nil
     }
   } else if self.None != nil { return VariableType{PY_TYPE_NONE, nil}, nil
+  } else if self.List != nil { return self.List.Eval(c)
+  } else if self.Dict != nil { return self.Dict.Eval(c)
   } else { return VariableType{PY_TYPE_UNDEFINED, nil}, errors.New("atomic value was not set")
   }
 }
@@ -625,21 +630,48 @@ type ExprList struct {
   Exprs []*Expr `@@ {"," @@ }[","]`
 }
 //-------------------------------------------------------------------------------------------------
-type List struct {
-  Items []*Atom `"[" { @@ [ "," ] } "]"`
+type ListDisplay struct {
+  Items []*Expr `"[" [ @@ {"," @@ }[","] ] "]"`
+}
+func (self *ListDisplay) Eval(c *Context) (VariableType, error) {
+  res := make([]VariableType, len(self.Items))
+  for idx, item := range self.Items {
+    item_res, err := item.Eval(c)
+    if err != nil {
+      return VariableType{PY_TYPE_UNDEFINED, nil}, err
+    } else {
+      res[idx] = item_res
+    }
+  }
+  return VariableType{PY_TYPE_LIST, res}, nil
 }
 //-------------------------------------------------------------------------------------------------
-type Tuple struct {
-  Items []*Atom `{ "(" @@ [ "," ] ")" }`
+type TupleDisplay struct {
+  Items []*Expr `"(" @@ {"," @@ }[","] ")"`
 }
 //-------------------------------------------------------------------------------------------------
-type Map struct {
-	Map []*MapItem `| "{" { @@ [ "," ] } "}"`
+type DictDisplay struct {
+	Entries []*KeyDatum `"{" [ @@ {"," @@ }[","] ] "}"`
+}
+func (self *DictDisplay) Eval(c *Context) (VariableType, error) {
+  res := make(map[VariableType]VariableType)
+  for _, item := range self.Entries {
+    key_res, key_err := item.Key.Eval(c)
+    val_res, val_err := item.Value.Eval(c)
+    if key_err != nil {
+      return VariableType{PY_TYPE_UNDEFINED, nil}, key_err
+    } else if val_err != nil {
+      return VariableType{PY_TYPE_UNDEFINED, nil}, val_err
+    } else {
+      res[key_res] = val_res
+    }
+  }
+  return VariableType{PY_TYPE_DICT, res}, nil
 }
 //-------------------------------------------------------------------------------------------------
-type MapItem struct {
-	Key   *Atom `@@ ":"`
-	Value *Atom `@@`
+type KeyDatum struct {
+	Key   *Expr `@@ ":"`
+	Value *Expr `@@`
 }
 //-------------------------------------------------------------------------------------------------
 type TargetList struct {

@@ -62,12 +62,15 @@ func FindTokenBoundaries(input string) []TokenBoundary {
         if sub == "{%" || sub == "{{" || sub == "{#" {
           token := TokenBoundary{sub, i, cur_line, cur_line_pos}
           bounds = append(bounds, token)
+          i += 1
         }
       } else if input[i] == '}' && i > 0 {
         sub := input[i-1:i+1]
         if sub == "%}" || sub == "}}" || sub == "#}" {
-          token := TokenBoundary{sub, i, cur_line, cur_line_pos}
-          bounds = append(bounds, token)
+          if sub != "}}" || i >= len(input) - 1 || input[i+1] != '}' {
+            token := TokenBoundary{sub, i, cur_line, cur_line_pos}
+            bounds = append(bounds, token)
+          }
         }
       }
     }
