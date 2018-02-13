@@ -1,19 +1,17 @@
-GOPATH=$(shell pwd)
-
 all: buildroot main plugins
 
 buildroot:
 	mkdir -p build/plugins/{action,connection,strategy}
 
 plugins: buildroot
-	GOPATH=$(GOPATH) go build -buildmode=plugin -o build/plugins/action/normal.so src/ansible/plugins/action/main/normal.go
-	GOPATH=$(GOPATH) go build -buildmode=plugin -o build/plugins/action/debug.so src/ansible/plugins/action/main/debug.go
-	GOPATH=$(GOPATH) go build -buildmode=plugin -o build/plugins/connection/local.so src/ansible/plugins/connection/main/local.go
-	GOPATH=$(GOPATH) go build -buildmode=plugin -o build/plugins/connection/ssh.so src/ansible/plugins/connection/main/ssh.go
-	GOPATH=$(GOPATH) go build -buildmode=plugin -o build/plugins/strategy/linear.so src/ansible/plugins/strategy/main/linear.go
+	go build -buildmode=plugin -o build/plugins/action/normal.so ansible/plugins/action/main/normal.go
+	go build -buildmode=plugin -o build/plugins/action/debug.so ansible/plugins/action/main/debug.go
+	go build -buildmode=plugin -o build/plugins/connection/local.so ansible/plugins/connection/main/local.go
+	go build -buildmode=plugin -o build/plugins/connection/ssh.so ansible/plugins/connection/main/ssh.go
+	go build -buildmode=plugin -o build/plugins/strategy/linear.so ansible/plugins/strategy/main/linear.go
 
 main: buildroot
-	GOPATH=$(GOPATH) go build -o build/ansible ansible.go
+	go build -o build/ansible ansible.go
 
 clean:
 	rm -rf build
